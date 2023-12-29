@@ -1,0 +1,4 @@
+allCountries = []
+allCurrencies = []
+allServices = []
+allPeople = []

@@ -1,0 +1,16 @@
+from enum import Enum
+
+
+class TYPE(Enum):
+    GOVERNMENT = 0
+    REGULAR = 1
+    ALL = 2
+
+
+COUNTRY_COUNT = 5
+SERVICE_COUNT = 500
+PEOPLE_COUNT = 10
+CEIL_PRICE = 500
+MAX_PROSPERITY = 20
+MAX_DAY = 500
+INTERVAL = 1
