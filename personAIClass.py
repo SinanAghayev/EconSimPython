@@ -1,123 +1,255 @@
 import random
+import os
+
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
 from constants import *
 from lists import *
 from priceChangeNN import PriceChangeNetwork
-import tensorflow as tf
-from tensorflow.keras import layers
 from personClass import Person
+import torch
 
 
 class PersonAI(Person):
     def __init__(self, name, age, gender, country):
         super().__init__(name, age, gender, country)
+        self.epsilon = 0.9
 
     def initNetworks(self):
-        self.q_network = create_q_network(len(self.personServices) * 6 + 2, 3)
-        # Initialize PriceChangeNetwork
-        self.price_change_net = self.create_price_change_network(
-            len(self.personServices) * 6 + 2, 1
-        )
+        self.q_networks = []
+        # self.price_change_nets = []
+        self.state_dim = 8
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # Define the device
+        # print(torch.cuda.is_available())
+        for i in range(len(self.personServices)):
+            self.q_networks.append(create_q_network(self.state_dim, 5, i))
+            self.q_networks[i].to(device)
+            self.q_networks[i].train()
+            self.optimizer = optim.Adam(self.q_networks[i].parameters(), lr=0.01)
+            self.loss_function = nn.MSELoss()
+            self.gamma = 0.9
 
     def personNext(self):
-        for service in self.personServices:
-            state = self.get_state()
-
-            action = self.get_action(state)  # Select action based on the current state
+        for service, i in zip(self.personServices, range(len(self.personServices))):
+            state = torch.tensor(self.get_state(service))
+            """
+            action, dummy = self.get_action(
+                state, i
+            )  # Select action based on the current state
             # Execute action in the environment
+
+            #if dummy < 0:
+             #   continue
 
             # Update agent's knowledge based on the observed transition
             self.take_action(action, service)  # Perform the selected action
-            self.get_reward(
+            reward = self.get_reward(
                 service, action
             )  # Get reward based on the new state and action
+            """
+            q_price, q_supply = self.q_networks[i](state)
+            try:
+                self.take_action_new(service, q_price.item(), q_supply.item())
+            except Exception as e:
+                return
+            reward = self.gamma * self.get_reward_new(service)
+            new_state = torch.tensor(self.get_state(service))
 
-    def get_action(self, state):
+            # Calculate the target Q-value
+            target_q_price = (
+                reward
+                + (1 - self.gamma)
+                * self.q_networks[i](new_state)[0]
+            )
+            target_q_supply = (
+                reward
+                + (1 - self.gamma)
+                * self.q_networks[i](new_state)[1]
+            )
+
+            # Use the Q-network to predict Q-values for the given state
+            
+            # Choose the action with the highest Q-value
+            ##action_index = torch.argmax(q_values)
+            # Get the predicted Q-value for the chosen action
+            ##predicted_q_value = q_values[action_index]
+
+            loss_price = self.loss_function(q_price, target_q_price)
+            loss_supply = self.loss_function(q_supply, target_q_supply)
+            total_loss = loss_price + loss_supply
+
+            self.optimizer.zero_grad()
+            total_loss.backward()
+            self.optimizer.step()
+
+            # print(action, self.balance)
+
+            #print(f"Target Q value shape: {target_q_value}")
+            #print(f"Predicted Q value shape: {predicted_q_value}")
+            #print(f"Target Q value shape: {target_q_value}")
+            #print(f"Predicted Q value shape: {predicted_q_value}")
+            # Calculate the loss
+
+            #self.optimizer.zero_grad()
+            #loss = self.loss_function(target_q_value, predicted_q_value)
+            #loss.backward()
+            #self.optimizer.step()
+        
+        self.prevBalance = self.balance
+
+    def get_action(self, state, i):
         # Use the Q-network to predict Q-values for the given state
-        q_values = self.q_network(
-            tf.convert_to_tensor(state)
-        )  # Assuming state is a list or array
+        q_values = self.q_networks[i](state)
 
         # Choose the action with the highest Q-value
-        action_index = tf.argmax(
-            q_values[0]
-        ).numpy()  # Extract the index of the action with the highest Q-value
+        action_index = torch.argmax(q_values).item()
         actions = [
-            "adjust_price",
+            "increase_price",
+            "decrease_price", 
             "add_supply",
             "remove_supply",
+            "do_nothing",
         ]  # List of possible actions
         action = actions[action_index]  # Get the action corresponding to the index
 
-        return action
+        return action_index, torch.max(q_values).item()
 
-    def get_state(self):
+    def get_state(self, service):
         state = [
             self.balance,
             self.balance - self.prevBalance,
         ]  # Adding total balance to the state representation
-        for service in self.personServices:
-            state.extend(
-                [
-                    service.demand,
-                    service.supply,
-                    service.price,
-                    service.price - service.previousPrice,
-                    service.revenue,
-                    service.revenue - service.prevRevenue,
-                ]
-            )
+        state.extend(
+            [
+                service.demand,
+                service.supply,
+                service.price,
+                service.price - service.previousPrice,
+                service.revenue,
+                service.revenue - service.prevRevenue,
+            ]
+        )
         return state
 
     def take_action(self, action, service):
+        if random.random() > self.epsilon:
+            action = random.randint(0, 4)
         # Define actions for each subject
-        if action == "adjust_price":
-            service.price += self.get_price_changes()
-        elif action == "add_supply":
-            if self.balance > 20 * service.price():
-                service.supply += 20
-                self.balance -= 20 * service.price()
-        elif action == "remove_supply":
-            if service.supply > 20:
-                service.supply -= 20
-                self.balance += 20 * service.price()
+        if action == 0:
+            service.price += service.price * random.uniform(0, 0.1)
+        if action == 1:
+            service.price -= service.price * random.uniform(0, 0.1)
+        elif action == 2:
+            if self.balance > 10 * service.costOfNewSupply:
+                service.supply += 10
+                self.balance -= 10 * service.costOfNewSupply
+        elif action == 3:
+            if service.supply > 10:
+                service.supply -= 10
+                self.balance += 10 * service.costOfNewSupply
+                
+    def take_action_new(self, service, price, supply):
+        # Define actions for each subject
+        supply = int(supply)
+        if service.price + price > 0:
+            service.price += price
+        if service.supply + supply < 0:
+            return
+        if self.balance > supply * service.costOfNewSupply:
+            service.supply += supply
+            self.balance -= supply * service.costOfNewSupply
 
     def get_reward(self, service, action):
-        # Calculate reward based on the effect of the action taken by the agent
+        reward = 0
 
-        # For instance, consider a simple scenario where increasing supply yields positive reward
-        if action == "add_supply":
-            # Check the effect of increasing supply on the revenue or demand of the service
-            reward = (
-                service.revenue * 0.1
-            )  # Adjust this calculation as per the desired impact
+        # Check the effect of increasing supply on the revenue or demand of the service
+        #reward = (
+        #    (service.revenue - service.prevRevenue) * 0.1
+        #)  # Adjust this calculation as per the desired impact
 
-        # Alternatively, penalize the agent for actions that result in a negative effect
-        elif action == "adjust_price":
-            # Penalize if the price adjustment leads to decreased revenue or demand
-            if service.revenue < service.prevRevenue:
-                reward = -10  # Penalize with a fixed amount
-
-        # If the action doesn't have a significant effect or other criteria, assign a neutral reward
+        if service.revenue < service.prevRevenue:
+            reward -= 20  # Penalize with a fixed amount
         else:
-            reward = 0
+            reward += 20
+
+        if self.balance < self.prevBalance:
+            reward -= 10 # Penalize with a fixed amount
+        else:
+            reward += 10
+
+        if service.supply == 0:
+            return reward
+        if service.demand / service.supply < 0.5 or service.demand / service.supply > 2:
+            reward -= 3
+        if 0.9 < service.demand / service.supply < 1.1:
+            reward += 3
+
+        return reward
+
+    def get_reward_new(self, service):
+        reward = 0
+
+        if service.revenue < service.prevRevenue:
+            reward -= 20  # Penalize with a fixed amount
+        else:
+            reward += 20
+
+        if self.balance < self.prevBalance:
+            reward -= 10 # Penalize with a fixed amount
+        else:
+            reward += 10
+
+        if service.supply == 0:
+            return reward
+        if service.demand / service.supply < 0.5 or service.demand / service.supply > 2:
+            reward -= 3
+        if 0.9 < service.demand / service.supply < 1.1:
+            reward += 3
+
+        reward -= service.supply
 
         return reward
 
     def create_price_change_network(self, state_dim, action_dim):
         return PriceChangeNetwork(state_dim, action_dim)
 
-    def get_price_changes(self, state):
+    def get_price_changes(self, state, i):
         # Assume state is flattened and passed as input to the DNN
-        return self.price_change_net(state)
+        return self.price_change_nets[i](state)
 
+    def save(self):
+        for i in range(len(allPeople[0].q_networks)):
+            torch.save(allPeople[0].q_networks[i].state_dict(), f"networks/q_network{i}.pt")
+            #print(f"Model {i} saved successfully")
+        #print("All models saved successfully")
+        return
 
 # Define the DNN architecture
-def create_q_network(input_dim, output_dim):
-    model = tf.keras.Sequential(
-        [
-            layers.Dense(64, activation="relu", input_shape=(input_dim,)),
-            layers.Dense(64, activation="relu"),
-            layers.Dense(output_dim),  # Output layer, output_dim neurons for Q-values
-        ]
-    )
+class QNetwork(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super(QNetwork, self).__init__()
+        self.fc1 = nn.Linear(input_dim, 64)
+        self.fc2 = nn.Linear(64, 64)
+        #self.fc3 = nn.Linear(64, output_dim)
+        self.fc3_price = nn.Linear(64, 1)
+        self.fc3_supply = nn.Linear(64, 1)
+
+    def forward(self, x):
+        x = torch.relu(self.fc1(x))
+        x = torch.relu(self.fc2(x))
+        #x = self.fc3(x)
+        #return x
+        change_in_price = self.fc3_price(x)  # Output for changing price
+        change_in_supply = self.fc3_supply(x)  # Output for changing supply
+        return change_in_price, change_in_supply
+
+
+def create_q_network(input_dim, output_dim, i):
+    model = QNetwork(input_dim, output_dim)
+    if os.path.exists("networks/q_network.pt") and read_from_file:
+        model.load_state_dict(torch.load(f"networks/q_network{i}.pt"))
+        # print(f"Model {i} loaded successfully")
     return model
+

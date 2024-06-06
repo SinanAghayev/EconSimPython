@@ -5,9 +5,9 @@ import random
 
 
 class RealTimeGraph:
-    def __init__(self, master, size):
+    def __init__(self, master, size, title=""):
         self.master = master
-        self.master.title("Real-time Graph")
+        self.master.title(title)
 
         self.fig, self.ax = plt.subplots()
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.master)
@@ -26,10 +26,7 @@ class RealTimeGraph:
 
         self.ax.clear()
         for i in range(len(newData)):
-            self.ax.plot(
-                range(max(0, self.day - self.MAX_DATA_POINTS), self.day),
-                self.data[i],
-                label=i,
+            self.ax.plot(range(max(0, self.day - self.MAX_DATA_POINTS), self.day),self.data[i],label=i,
             )
         self.ax.set_title("Real-time Graph")
         self.canvas.draw()

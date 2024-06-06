@@ -1,11 +1,16 @@
 import random
+import time
+from personAIClass import PersonAI
 from constants import *
 
 
 class Service(object):
     servicesBought = 0
+    service_id = 0
 
     def __init__(self, name, basePrice, initialSupply, seller, serviceType) -> None:
+        self.id = Service.service_id
+        Service.service_id += 1
         self.name = name
         self.basePrice = basePrice
         self.supply = initialSupply
@@ -23,6 +28,7 @@ class Service(object):
         self.currency.demand += self.price
 
         self.newSupply = random.randint(1, 20)
+        self.costOfNewSupply = random.uniform(self.price, 100)
         self.seller.personServices.append(self)
 
         self.agePref = {}
@@ -36,12 +42,14 @@ class Service(object):
         self.prevRevenue = 0
         self.revenue = 0
 
-    def addSupply(self):
-        # TODO
+    def adjustSupply(self):
         if self.supply * 2 < self.demand:
             self.invest()
         if self.supply < self.demand:
             self.supply += self.newSupply
+        if self.seller.balance < 0 and self.supply > 0:
+            self.supply -= 1
+            self.seller.balance += self.price
 
     def invest(self):
         # TODO : MONEY DISAPPEARS HERE, FIND A SOLUTION
@@ -50,9 +58,10 @@ class Service(object):
             self.newSupply *= 11 / 10
 
     def adjustPrice(self):
-        if random.random() < 0.1:
+        if random.random() < 0.1 and self.seller.__class__ != PersonAI:
             self.previousPrice = self.price
-            self.price = self.basePrice * (self.demand / self.supply)
+            if self.supply > 0 and self.demand > 0:
+                self.price = self.basePrice * (self.demand / self.supply)
         self.prevRevenue = self.revenue
         self.revenue = 0
 

@@ -1,4 +1,6 @@
+import os
 import random
+import shutil
 import time
 import tkinter as tk
 
@@ -15,7 +17,6 @@ from test import RealTimeGraph
 
 day = 0
 
-
 def start():
     initCurrencies()
     initCountries()
@@ -23,10 +24,15 @@ def start():
     initServices()
     setAllPreferences()
     setTaxes()
+    
+    if allPeople[0].__class__ == PersonAI:
+        allPeople[0].initNetworks()
 
 
 def update():
     nextIteration()
+    if day % 100 == 0:
+        print("Day: ", day, " Balance: ", allPeople[0].balance)
 
 
 def nextIteration():
@@ -50,10 +56,11 @@ def calculateInflation():
 
 def serviceActions():
     for service in allServices:
+        service.adjustPrice()
+        service.price = min(service.price, MAX_PRICE)
         if service.seller is allPeople[0]:
             continue
-        service.addSupply()
-        service.adjustPrice()
+        service.adjustSupply()
 
 
 def currencyActions():
@@ -69,6 +76,7 @@ def countryActions():
 def peopleActions():
     for person in allPeople:
         person.personNext()
+        person.balance += 1
 
 
 def setExchangeRates():
@@ -84,29 +92,62 @@ def setAllPreferences():
 
 
 def initCurrencies():
+    allCurrencies.clear()
+    if read_from_file:
+        with open("data/currencies.txt", "r") as f:
+            for line in f:
+                arg = line.strip().split()
+                currency = Currency(arg[0])
+                allCurrencies.append(currency)
+    
     for i in range(COUNTRY_COUNT):
-        currency = Currency("Currency " + str(i))
+        currency = Currency("Currency_" + str(i))
         allCurrencies.append(currency)
     for i in range(COUNTRY_COUNT):
         for j in range(COUNTRY_COUNT):
             allCurrencies[i].exchangeRate[allCurrencies[j]] = 1
 
-
 def initCountries():
+    allCountries.clear()
+    if read_from_file:
+        with open("data/countries.txt", "r") as f:
+            for line in f:
+                arg = line.strip().split()
+                country = Country(arg[0], allCurrencies[int(arg[1])], int(arg[2]))
+                allCountries.append(country)
+    
     for i in range(COUNTRY_COUNT):
         prosperity = random.randint(1, MAX_PROSPERITY)
-        country = Country("Country " + str(i), allCurrencies[i], prosperity)
+        country = Country("Country_" + str(i), allCurrencies[i], prosperity)
         allCountries.append(country)
 
 
 def initServices():
+    Service.service_id = 0
+    allServices.clear()
+    if read_from_file:
+        with open("data/services.txt", "r") as f:
+            for line in f:
+                arg = line.strip().split()
+                price = float(arg[1])
+                initialSupply = int(arg[2])
+                service = Service(
+                    arg[0],
+                    price,
+                    initialSupply,
+                    allPeople[int(arg[3])],
+                    int(arg[4]),
+                )
+                allServices.append(service)
+        return
+    Service.service_id = 0
     for i in range(SERVICE_COUNT):
         price = random.uniform(1, CEIL_PRICE)
-        initialSupply = random.randint(1, 100)
+        initialSupply = 10
 
         rnd = random.randint(0, PEOPLE_COUNT - 1)
         service = Service(
-            "Service " + str(i),
+            "Service_" + str(i),
             price,
             initialSupply,
             allPeople[rnd],
@@ -116,17 +157,42 @@ def initServices():
 
 
 def initPeople():
+    allPeople.clear()
+    if read_from_file:
+        with open("data/people.txt", "r") as f:
+            for i, line in enumerate(f):
+                arg = line.strip().split()
+                name = arg[0]
+                age = int(arg[1])
+                gender = int(arg[2])
+                country = allCountries[int(arg[3])]
+                if i == 0 and aiPersonExists:
+                    person = PersonAI(name, age, gender, country)
+                else:
+                    person = Person(name, age, gender, country)
+                allPeople.append(person)
+
+                person.demandedServices = [(0, 0)] * SERVICE_COUNT
+        return
+    
+    if os.path.exists("networks"):
+        shutil.rmtree("networks")
+    os.mkdir("networks")
+
     for i in range(PEOPLE_COUNT):
         age = random.randint(0, 3)
         gender = random.randint(0, 1)
         country = random.randint(0, COUNTRY_COUNT - 1)
 
-        if i == 0:
-            person = PersonAI("Person " + str(i), age, gender, allCountries[country])
+        if i == 0 and aiPersonExists:
+            person = PersonAI("Person_" + str(i), age, gender, allCountries[country])
             person.initNetworks()
         else:
-            person = Person("Person " + str(i), age, gender, allCountries[country])
+            person = Person("Person_" + str(i), age, gender, allCountries[country])
         allPeople.append(person)
+
+        # First demand or not, second time of demand
+        person.demandedServices = [(0, 0)] * SERVICE_COUNT
 
 
 def setTaxes():
@@ -144,15 +210,77 @@ def checkKeyboard():
     if wait:
         time.sleep(0.1)
 
+show_index = 0
 
-start()
-root = tk.Tk()
-app = RealTimeGraph(root, PEOPLE_COUNT)
+def episode(i):
+    if i != 0:
+        global read_from_file
+        read_from_file = True
+    start()
+    print(f"Episode {i} started")
+    root = tk.Tk()
+    app = RealTimeGraph(root, PEOPLE_COUNT, "People Balance")
 
-wait = False
+    serv_root = tk.Tk()
+    serv_app = RealTimeGraph(serv_root, len(allPeople[show_index].personServices), "Service Price")
+
+    serv_dem_root = tk.Tk()
+    serv_dem_app = RealTimeGraph(serv_dem_root, len(allPeople[show_index].personServices), "Service Demand")
+
+    serv_sup_root = tk.Tk()
+    serv_sup_app = RealTimeGraph(serv_sup_root, len(allPeople[show_index].personServices), "Service Supply")
+
+    global wait
+    wait = False
+    while True:
+        global day
+        
+        update()
+        temp = [person.balance for person in allPeople]
+        app.update_graph(temp)
+        serv_app.update_graph([serv.price for serv in allPeople[show_index].personServices])
+        serv_dem_app.update_graph([serv.demand for serv in allPeople[show_index].personServices])
+        serv_sup_app.update_graph([serv.supply for serv in allPeople[show_index].personServices])
+        root.update()
+        serv_root.update()
+        serv_dem_root.update()
+        serv_sup_root.update()
+        
+        if (day + 1) % 50 == 0 and allPeople[0].__class__ == PersonAI:
+            allPeople[0].gamma *= 0.9
+        if (day + 1) % 100 == 0 and allPeople[0].__class__ == PersonAI:
+            allPeople[0].save()
+        if (day + 1) % 250 == 0:
+            root.destroy()
+            serv_root.destroy()
+            serv_dem_root.destroy()
+            serv_sup_root.destroy()
+            day = 0
+            print(f"AI balance: {allPeople[0].balance}")
+            break
+
+        checkKeyboard()
+
+def write_data():
+    with open("data/people.txt", "w") as f:
+        for person in allPeople:
+            f.write(f"{person.name} {person.age} {person.gender} {allCountries.index(person.country)}\n")
+    with open("data/countries.txt", "w") as f:
+        for country in allCountries:
+            f.write(f"{country.name} {allCurrencies.index(country.currency)} {country.prosperity}\n")
+    with open("data/services.txt", "w") as f:
+        for service in allServices:
+            f.write(f"{service.name} {service.price} {int(service.supply)} {allPeople.index(service.seller)} {service.serviceType}\n")
+    with open("data/currencies.txt", "w") as f:
+        for currency in allCurrencies:
+            f.write(f"{currency.name}\n")
+
+print("Starting simulation...")
+i = 0
 while True:
-    update()
-    temp = [person.balance for person in allPeople]
-    app.update_graph(temp)
-    root.update()
-    checkKeyboard()
+    episode(i)
+    print(f"Episode {i} finished")
+    write_data()
+    print("Data written to files")
+    i += 1
+
