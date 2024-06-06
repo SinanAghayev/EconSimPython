@@ -20,7 +20,7 @@ class RealTimeGraph:
     def update_graph(self, newData, day):
         for i in range(len(newData)):
             self.data[i].append([newData[i], day])
-            if len(self.data[i]) > self.MAX_DATA_POINTS:
+            if len(self.data[i]) > self.MAX_DATA_POINTS or day - self.data[i][0][1] > self.MAX_DATA_POINTS:
                 self.data[i].pop(0)
 
         self.ax.clear()

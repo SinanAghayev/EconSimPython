@@ -1,0 +1,4 @@
+tkinter
+matplotlib
+keyboard
+torch # if AI is enabled

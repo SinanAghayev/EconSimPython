@@ -1,15 +1,5 @@
 import sys
 import os
-import random
-import shutil
-
-import tkinter as tk
-
-from data_types.currency_class import Currency
-from data_types.country_class import Country
-from data_types.service_class import Service
-from data_types.person_class import Person
-from data_types.person_ai_class import PersonAI
 
 from data_types.constants import *
 from data_types.lists import *
@@ -18,8 +8,6 @@ from functions.initialize import *
 from functions.update_functions import *
 from functions.io_functions import *
 from functions.graph_functions import *
-
-from functions.graph import RealTimeGraph
 
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))

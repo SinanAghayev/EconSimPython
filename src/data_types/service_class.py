@@ -1,5 +1,4 @@
 import random
-import time
 from .person_ai_class import PersonAI
 from .constants import *
 

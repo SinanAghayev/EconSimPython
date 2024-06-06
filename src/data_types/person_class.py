@@ -1,7 +1,6 @@
 import random
 from .lists import *
 
-
 class Person(object):
     def __init__(self, name, age, gender, country) -> None:
         self.name = name
