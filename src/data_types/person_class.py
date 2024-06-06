@@ -1,5 +1,5 @@
 import random
-from lists import *
+from .lists import *
 
 
 class Person(object):

@@ -1,7 +1,7 @@
 import random
-from constants import *
-from lists import *
-from serviceClass import Service
+from .constants import *
+from .lists import *
+from .service_class import Service
 
 
 class Country(object):

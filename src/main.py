@@ -1,3 +1,4 @@
+import sys
 import os
 import random
 import shutil
@@ -5,15 +6,18 @@ import time
 import tkinter as tk
 
 import keyboard
-from constants import *
-from lists import *
-from currencyClass import Currency
-from countryClass import Country
-from serviceClass import Service
-from personClass import Person
-from personAIClass import PersonAI
+from data_types.constants import *
+from data_types.lists import *
+from data_types.currency_class import Currency
+from data_types.country_class import Country
+from data_types.service_class import Service
+from data_types.person_class import Person
+from data_types.person_ai_class import PersonAI
 
-from test import RealTimeGraph
+from graph import RealTimeGraph
+
+# Add the project root to the Python path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 day = 0
 

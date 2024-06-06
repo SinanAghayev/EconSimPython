@@ -7,3 +7,6 @@ Currency_2
 Currency_0
 Currency_1
 Currency_2
+Currency_0
+Currency_1
+Currency_2

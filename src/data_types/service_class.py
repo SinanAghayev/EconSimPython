@@ -1,7 +1,7 @@
 import random
 import time
-from personAIClass import PersonAI
-from constants import *
+from .person_ai_class import PersonAI
+from .constants import *
 
 
 class Service(object):

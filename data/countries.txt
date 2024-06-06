@@ -7,3 +7,6 @@ Country_2 2 12
 Country_0 0 19
 Country_1 1 2
 Country_2 2 9
+Country_0 0 17
+Country_1 1 19
+Country_2 2 17
