@@ -30,7 +30,7 @@ class PersonAI(Person):
             self.q_networks[i].train()
             self.optimizer = optim.Adam(self.q_networks[i].parameters(), lr=0.01)
             self.loss_function = nn.MSELoss()
-            self.gamma = 0.9
+            self.alpha = 0.9
 
     def personNext(self):
         for service, i in zip(self.personServices, range(len(self.personServices))):
@@ -41,18 +41,18 @@ class PersonAI(Person):
                 self.take_action(service, q_price.item(), q_supply.item())
             except Exception as e:
                 return
-            reward = self.gamma * self.get_reward(service)
+            reward = self.alpha * self.get_reward(service)
             new_state = torch.tensor(self.get_state(service))
 
             # Calculate the target Q-value
             target_q_price = (
                 reward
-                + (1 - self.gamma)
+                + (1 - self.alpha)
                 * self.q_networks[i](new_state)[0]
             )
             target_q_supply = (
                 reward
-                + (1 - self.gamma)
+                + (1 - self.alpha)
                 * self.q_networks[i](new_state)[1]
             )
 
@@ -124,7 +124,7 @@ class PersonAI(Person):
 
     def save(self):
         for i in range(len(allPeople[0].q_networks)):
-            torch.save(allPeople[0].q_networks[i].state_dict(), f"networks/q_network{i}.pt")
+            torch.save(allPeople[0].q_networks[i].state_dict(), f"data/networks/q_network{i}.pt")
             #print(f"Model {i} saved successfully")
         #print("All models saved successfully")
         return

@@ -1,8 +1,8 @@
 import tkinter as tk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
-import random
 
+import data_types.constants as constants
 
 class RealTimeGraph:
     def __init__(self, master, size, title=""):
@@ -15,19 +15,19 @@ class RealTimeGraph:
         self.canvas_widget.pack(fill=tk.BOTH, expand=True)
 
         self.data = [[] for i in range(size)]
-        self.MAX_DATA_POINTS = 50
-        self.day = 1
+        self.MAX_DATA_POINTS = constants.MAX_GRAPH_DATA_POINTS
 
-    def update_graph(self, newData):
+    def update_graph(self, newData, day):
         for i in range(len(newData)):
-            self.data[i].append(newData[i])
+            self.data[i].append([newData[i], day])
             if len(self.data[i]) > self.MAX_DATA_POINTS:
                 self.data[i].pop(0)
 
         self.ax.clear()
         for i in range(len(newData)):
-            self.ax.plot(range(max(0, self.day - self.MAX_DATA_POINTS), self.day),self.data[i],label=i,
-            )
+            x = [self.data[i][j][1] for j in range(len(self.data[i]))]
+            y = [self.data[i][j][0] for j in range(len(self.data[i]))]
+            self.ax.plot(x, y, label=i)
         self.ax.set_title("Real-time Graph")
         self.canvas.draw()
-        self.day += 1
+
