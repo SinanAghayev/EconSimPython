@@ -23,12 +23,15 @@ def episode(i):
     initialize_new_graph(lambda: [serv.price for serv in allPeople[show_index].personServices], len(allPeople[show_index].personServices), "Service Price")
     initialize_new_graph(lambda: [serv.demand for serv in allPeople[show_index].personServices], len(allPeople[show_index].personServices), "Service Demand")
     initialize_new_graph(lambda: [serv.supply for serv in allPeople[show_index].personServices], len(allPeople[show_index].personServices), "Service Supply")
+    initialize_new_graph(lambda: [serv.bought_recently_count for serv in allPeople[show_index].personServices], len(allPeople[show_index].personServices), "Service Bought Recently Count")
+    initialize_new_graph(lambda: [serv.can_buy_count for serv in allPeople[show_index].personServices], len(allPeople[show_index].personServices), "Service Can Buy Count")
 
     while True:
         update(day)
         if keyboard_constants["visualize"]:
             update_graphs(day)
         check_keyboard()
+        after_update()
 
         print("Day: ", day)
 

@@ -18,6 +18,7 @@ def update_graphs(day):
         graph_roots[i].update()
         
 def close_graphs():
+    plt.close('all')
     for root in graph_roots:
         root.destroy()
     graph_roots.clear()

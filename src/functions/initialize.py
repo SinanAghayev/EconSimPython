@@ -18,8 +18,13 @@ def start():
     allCountries.clear()
     allPeople.clear()
     allServices.clear()
-    
+
     init_currencies()
+
+    for i in range(COUNTRY_COUNT):
+        for j in range(COUNTRY_COUNT):
+            allCurrencies[i].exchangeRate[allCurrencies[j]] = 1
+
     init_countries()
     init_people()
     init_services()
@@ -32,20 +37,18 @@ def start():
 def init_currencies():
     if read_from_file:
         read_currencies_data()
+        return
 
     for i in range(COUNTRY_COUNT):
         currency = Currency("Currency_" + str(i))
         allCurrencies.append(currency)
 
-    for i in range(COUNTRY_COUNT):
-        for j in range(COUNTRY_COUNT):
-            allCurrencies[i].exchangeRate[allCurrencies[j]] = 1
 
 def init_countries():
     if read_from_file:
         read_countries_data()
         return
-    
+
     for i in range(COUNTRY_COUNT):
         prosperity = random.randint(1, MAX_PROSPERITY)
         country = Country("Country_" + str(i), allCurrencies[i], prosperity)
@@ -64,7 +67,12 @@ def init_services():
         price = random.uniform(1, CEIL_PRICE)
         initialSupply = 10
 
-        rnd = random.randint(0, PEOPLE_COUNT - 1)
+        # First service is sold by the first person and the rest are sold by random people
+        if i == 0:
+            rnd = 0
+        else:
+            rnd = random.randint(1, PEOPLE_COUNT - 1)
+
         service = Service(
             "Service_" + str(i),
             price,
@@ -79,7 +87,7 @@ def init_people():
     if read_from_file:
         read_people_data()
         return
-    
+
     if os.path.exists("networks"):
         shutil.rmtree("networks")
     os.mkdir("networks")
@@ -97,7 +105,7 @@ def init_people():
         allPeople.append(person)
 
         # First demand or not, second time of demand
-        person.demandedServices = [(0, 0)] * SERVICE_COUNT
+        person.demandedServices = [(False, 0)] * SERVICE_COUNT
 
 def set_all_preferences():
     for person in allPeople:

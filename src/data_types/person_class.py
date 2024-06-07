@@ -43,15 +43,16 @@ class Person(object):
                 servicePref = -1
             self.prefService[service] = servicePref
 
+            # Demand services that are cheap and have high preference and are not already demanded
             priceInLocal = service.price * service.currency.exchangeRate[self.country.currency]
-            if servicePref > self.saveUrge and priceInLocal < self.balance and self.demandedServices[service.id][0] == 0 and self.demandedServices[service.id][1] > 7:
+            if not self.demandedServices[service.id][0] and servicePref > self.saveUrge and priceInLocal < self.balance and self.demandedServices[service.id][1] > 7:
                 service.demand += 1
-                self.demandedServices[service.id] = (1, 0)
-            elif (servicePref < self.saveUrge or priceInLocal < self.balance) and self.demandedServices[service.id][0]:
+                self.demandedServices[service.id] = (True, 0)
+            elif (servicePref < self.saveUrge or priceInLocal > self.balance) and self.demandedServices[service.id][0]:
                 service.demand -= 1
-                self.demandedServices[service.id] = (0, 0)
-            else:
-                self.demandedServices[service.id] = (0, self.demandedServices[service.id][1] + 1)
+                self.demandedServices[service.id] = (False, 0)
+            elif not self.demandedServices[service.id][0]:
+                self.demandedServices[service.id] = (False, self.demandedServices[service.id][1] + 1)
 
     def setSaveUrge(self):
         if random.random() < 0.1:
@@ -64,7 +65,7 @@ class Person(object):
             if (
                 self.prefService[service] > self.saveUrge
                 and service.supply > 1
-                and random.random() > 0.5
+                and random.random() > 0.1
             ):
                 if self.buy(service):
                     bought.append(service)
@@ -73,10 +74,11 @@ class Person(object):
 
     def buy(self, service):
         priceInLocal = (
-            service.price * service.currency.exchangeRate[self.country.currency]
+                    service.price * service.currency.exchangeRate[self.country.currency]
         )
-        if self.balance < priceInLocal * (1 + self.country.importTax[service]):
+        if priceInLocal > self.balance:
             return False
+        service.can_buy_count += 1
         if self.country != service.originCountry:
             self.country.gdp -= priceInLocal
 
@@ -88,7 +90,7 @@ class Person(object):
 
         if self.demandedServices[service.id][0]:
             service.demand -= 1
-            self.demandedServices[service.id] = (0, 0)
+            self.demandedServices[service.id] = (False, 0)
         service.buyThis()
-        
+
         return True

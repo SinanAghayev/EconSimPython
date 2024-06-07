@@ -1,15 +1,11 @@
 import os
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import random
 
-from .constants import *
-from .lists import *
-
-from .person_class import Person
-
-
+from data_types.person_class import Person
+from data_types.constants import *
 
 class PersonAI(Person):
     def __init__(self, name, age, gender, country):
@@ -17,64 +13,77 @@ class PersonAI(Person):
         self.epsilon = 0.9
 
     def initNetworks(self):
-        self.q_networks = []
-        # self.price_change_nets = []
-        self.state_dim = 8
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')  # Define the device
-        # print(torch.cuda.is_available())
+        self.q_price_networks = []
+        self.q_supply_networks = []
+        self.price_optimizer = []
+        self.supply_optimizer = []
+        self.state_dim = 9
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         for i in range(len(self.personServices)):
-            self.q_networks.append(create_q_network(self.state_dim, 5, i))
-            self.q_networks[i].to(device)
-            self.q_networks[i].train()
-            self.optimizer = optim.Adam(self.q_networks[i].parameters(), lr=0.01)
-            self.loss_function = nn.MSELoss()
-            self.alpha = 0.9
+            self.q_price_networks.append(create_q_network(self.state_dim, 1, i, "price"))
+            self.q_price_networks[i].to(device)
+            self.q_price_networks[i].train()
+
+            self.q_supply_networks.append(create_q_network(self.state_dim, 1, i, "supply"))
+            self.q_supply_networks[i].to(device)
+            self.q_supply_networks[i].train()
+
+            self.price_optimizer.append(optim.Adam(self.q_price_networks[i].parameters(), lr=0.01))
+            self.supply_optimizer.append(optim.Adam(self.q_supply_networks[i].parameters(), lr=0.01))
+
+        self.loss_function = nn.MSELoss()
+        self.alpha = 0.9
+        self.q_price = [None] * len(self.personServices)
+        self.q_supply = [None] * len(self.personServices)
 
     def personNext(self):
         for service, i in zip(self.personServices, range(len(self.personServices))):
-            state = torch.tensor(self.get_state(service))
+            state = torch.tensor(self.get_state(service), dtype=torch.float32)
 
-            q_price, q_supply = self.q_networks[i](state)
-            try:
-                self.take_action(service, q_price.item(), q_supply.item())
-            except Exception as e:
-                return
-            reward = self.alpha * self.get_reward(service)
-            new_state = torch.tensor(self.get_state(service))
+            # Epsilon-greedy action selection for price
+            if random.random() < self.epsilon:
+                self.q_price[i] = self.q_price_networks[i](state)
+            else:
+                self.q_price[i] = torch.tensor([random.uniform(-1, 1)], dtype=torch.float32, requires_grad=True)
 
-            # Calculate the target Q-value
-            target_q_price = (
-                reward
-                + (1 - self.alpha)
-                * self.q_networks[i](new_state)[0]
-            )
-            target_q_supply = (
-                reward
-                + (1 - self.alpha)
-                * self.q_networks[i](new_state)[1]
-            )
+            # Epsilon-greedy action selection for supply
+            if random.random() < self.epsilon:
+                self.q_supply[i] = self.q_supply_networks[i](state)
+            else:
+                self.q_supply[i] = torch.tensor([random.uniform(-1, 1)], dtype=torch.float32, requires_grad=True)
 
+            self.take_action(service, self.q_price[i].item(), self.q_supply[i].item())
 
-            loss_price = self.loss_function(q_price, target_q_price)
-            loss_supply = self.loss_function(q_supply, target_q_supply)
-            total_loss = loss_price + loss_supply
-
-            self.optimizer.zero_grad()
-            total_loss.backward()
-            self.optimizer.step()
-
-        
         self.prevBalance = self.balance
+
+    def backpropagate(self):
+        for service, i in zip(self.personServices, range(len(self.personServices))):
+
+            # Direct Q-value update using observed reward
+            target_q_price = self.get_price_reward(service)
+            target_q_supply = self.get_supply_reward(service)
+
+            loss_price = self.loss_function(self.q_price[i], torch.tensor([target_q_price], dtype=torch.float32))
+            loss_supply = self.loss_function(self.q_supply[i], torch.tensor([target_q_supply], dtype=torch.float32))
+
+            self.price_optimizer[i].zero_grad()
+            loss_price.backward()
+            self.price_optimizer[i].step()
+
+            self.supply_optimizer[i].zero_grad()
+            loss_supply.backward()
+            self.supply_optimizer[i].step()
 
     def get_state(self, service):
         state = [
             self.balance,
             self.balance - self.prevBalance,
-        ]  # Adding total balance to the state representation
+        ]
         state.extend(
             [
                 service.demand,
                 service.supply,
+                service.demand - service.supply,
                 service.price,
                 service.price - service.previousPrice,
                 service.revenue,
@@ -83,9 +92,7 @@ class PersonAI(Person):
         )
         return state
 
-                
     def take_action(self, service, price, supply):
-        # Define actions for each subject
         supply = int(supply)
         if service.price + price > 0:
             service.price += price
@@ -95,36 +102,54 @@ class PersonAI(Person):
             service.supply += supply
             self.balance -= supply * service.costOfNewSupply
 
-
-    def get_reward(self, service):
+    def get_price_reward(self, service):
         reward = 0
 
+        if service.bought_recently_count == 0:
+            reward -= 75
+        else:
+            reward += service.bought_recently_count
+
         if service.revenue < service.prevRevenue:
-            reward -= 20  # Penalize with a fixed amount
+            reward -= 20
         else:
             reward += 20
 
         if self.balance < self.prevBalance:
-            reward -= 10 # Penalize with a fixed amount
+            reward -= 5
+        else:
+            reward += 5
+
+        return reward
+    
+    def get_supply_reward(self, service):
+        reward = 0
+
+        if service.revenue < service.prevRevenue:
+            reward -= 10
         else:
             reward += 10
 
-        if service.supply == 0:
+        if self.balance < self.prevBalance:
+            reward -= 5
+        else:
+            reward += 5
+
+        if service.supply < 2:
             return reward
         if service.demand / service.supply < 0.5 or service.demand / service.supply > 2:
-            reward -= 3
+            reward -= 5
         if 0.9 < service.demand / service.supply < 1.1:
-            reward += 3
+            reward += 20
 
-        reward -= service.supply
+        reward += service.demand - service.supply
 
         return reward
 
     def save(self):
-        for i in range(len(allPeople[0].q_networks)):
-            torch.save(allPeople[0].q_networks[i].state_dict(), f"data/networks/q_network{i}.pt")
-            #print(f"Model {i} saved successfully")
-        #print("All models saved successfully")
+        for i in range(len(self.q_price_networks)):
+            torch.save(self.q_price_networks[i].state_dict(), f"data/networks/q_price_network{i}.pt")
+            torch.save(self.q_supply_networks[i].state_dict(), f"data/networks/q_supply_network{i}.pt")
         return
 
 # Define the DNN architecture
@@ -133,24 +158,16 @@ class QNetwork(nn.Module):
         super(QNetwork, self).__init__()
         self.fc1 = nn.Linear(input_dim, 64)
         self.fc2 = nn.Linear(64, 64)
-        #self.fc3 = nn.Linear(64, output_dim)
-        self.fc3_price = nn.Linear(64, 1)
-        self.fc3_supply = nn.Linear(64, 1)
+        self.fc3 = nn.Linear(64, output_dim)
 
     def forward(self, x):
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
-        #x = self.fc3(x)
-        #return x
-        change_in_price = self.fc3_price(x)  # Output for changing price
-        change_in_supply = self.fc3_supply(x)  # Output for changing supply
-        return change_in_price, change_in_supply
+        x = self.fc3(x)
+        return x
 
-
-def create_q_network(input_dim, output_dim, i):
+def create_q_network(input_dim, output_dim, i, network_type):
     model = QNetwork(input_dim, output_dim)
-    if os.path.exists("networks/q_network.pt") and read_from_file:
-        model.load_state_dict(torch.load(f"networks/q_network{i}.pt"))
-        # print(f"Model {i} loaded successfully")
+    if os.path.exists(f"data/networks/q_{network_type}_network{i}.pt") and read_from_file:
+        model.load_state_dict(torch.load(f"data/networks/q_{network_type}_network{i}.pt"))
     return model
-

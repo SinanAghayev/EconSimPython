@@ -38,7 +38,7 @@ def read_countries_data():
             arg = line.strip().split()
             country = Country(arg[0], allCurrencies[int(arg[1])], int(arg[2]))
             allCountries.append(country)
-            
+
 def read_services_data():
     with open("data/services.txt", "r") as f:
             for line in f:

@@ -40,6 +40,8 @@ class Service(object):
 
         self.prevRevenue = 0
         self.revenue = 0
+        self.bought_recently_count = 0
+        self.can_buy_count = 0
 
     def adjustSupply(self):
         if self.supply * 2 < self.demand:
@@ -77,3 +79,4 @@ class Service(object):
 
         self.revenue += self.price
         self.servicesBought += 1
+        self.bought_recently_count += 1
