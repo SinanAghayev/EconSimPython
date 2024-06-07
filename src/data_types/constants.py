@@ -24,7 +24,7 @@ INTERVAL = 1 # Number of days between each update
 
 
 aiPersonExists = True # If True, the program will create an AI person. If False, the program will not create an AI person.
-read_from_file = False # If True, the program will read from the data files. If False, the program will generate new data.
-
+read_from_file = True # If True, the program will read from the data files. If False, the program will generate new data.
+read_networks_from_file = True # If True, the program will read the neural network data from the files. If False, the program will generate new neural networks.
 
 MAX_GRAPH_DATA_POINTS = 50 # This is the maximum number of data points that can be displayed on the graph at once

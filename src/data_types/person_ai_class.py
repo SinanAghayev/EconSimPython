@@ -168,6 +168,6 @@ class QNetwork(nn.Module):
 
 def create_q_network(input_dim, output_dim, i, network_type):
     model = QNetwork(input_dim, output_dim)
-    if os.path.exists(f"data/networks/q_{network_type}_network{i}.pt") and read_from_file:
+    if os.path.exists(f"data/networks/q_{network_type}_network{i}.pt") and read_networks_from_file:
         model.load_state_dict(torch.load(f"data/networks/q_{network_type}_network{i}.pt"))
     return model
