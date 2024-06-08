@@ -27,7 +27,7 @@ class Service(object):
         self.currency.demand += self.price
 
         self.newSupply = random.randint(1, 20)
-        self.costOfNewSupply = random.uniform(self.price, 100)
+        self.costOfNewSupply = random.uniform(self.price - 5, self.price + 5)
         self.seller.personServices.append(self)
 
         self.agePref = {}

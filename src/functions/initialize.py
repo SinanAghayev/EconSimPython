@@ -68,10 +68,7 @@ def init_services():
         initialSupply = 10
 
         # First service is sold by the first person and the rest are sold by random people
-        if i == 0:
-            rnd = 0
-        else:
-            rnd = random.randint(1, PEOPLE_COUNT - 1)
+        rnd = random.randint(0, PEOPLE_COUNT - 1)
 
         service = Service(
             "Service_" + str(i),

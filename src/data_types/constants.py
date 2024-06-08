@@ -14,8 +14,8 @@ keyboard_constants = {
 }
 
 COUNTRY_COUNT = 3 # Number of countries
-SERVICE_COUNT = 100 # Number of services
-PEOPLE_COUNT = 200 # Number of people
+SERVICE_COUNT = 200 # Number of services
+PEOPLE_COUNT = 50 # Number of people
 CEIL_PRICE = 500 # Maximum starting price of a service
 MAX_PRICE = 100000 # Maximum price of a service
 MAX_PROSPERITY = 20 # Maximum prosperity of a country

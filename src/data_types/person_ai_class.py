@@ -17,7 +17,7 @@ class PersonAI(Person):
         self.q_supply_networks = []
         self.price_optimizer = []
         self.supply_optimizer = []
-        self.state_dim = 9
+        self.state_dim = 8
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         for i in range(len(self.personServices)):
             self.q_price_networks.append(create_q_network(self.state_dim, 1, i, "price"))
@@ -54,8 +54,6 @@ class PersonAI(Person):
 
             self.take_action(service, self.q_price[i].item(), self.q_supply[i].item())
 
-        self.prevBalance = self.balance
-
     def backpropagate(self):
         for service, i in zip(self.personServices, range(len(self.personServices))):
 
@@ -75,12 +73,13 @@ class PersonAI(Person):
             self.supply_optimizer[i].step()
 
     def get_state(self, service):
+        """
         state = [
             self.balance,
             self.balance - self.prevBalance,
         ]
-        state.extend(
-            [
+        """
+        state = [
                 service.demand,
                 service.supply,
                 service.demand - service.supply,
@@ -88,8 +87,8 @@ class PersonAI(Person):
                 service.price - service.previousPrice,
                 service.revenue,
                 service.revenue - service.prevRevenue,
+                service.bought_recently_count,
             ]
-        )
         return state
 
     def take_action(self, service, price, supply):
@@ -106,7 +105,7 @@ class PersonAI(Person):
         reward = 0
 
         if service.bought_recently_count == 0:
-            reward -= 75
+            reward -= 5
         else:
             reward += service.bought_recently_count
 
@@ -115,13 +114,8 @@ class PersonAI(Person):
         else:
             reward += 20
 
-        if self.balance < self.prevBalance:
-            reward -= 5
-        else:
-            reward += 5
-
         return reward
-    
+
     def get_supply_reward(self, service):
         reward = 0
 
@@ -130,11 +124,6 @@ class PersonAI(Person):
         else:
             reward += 10
 
-        if self.balance < self.prevBalance:
-            reward -= 5
-        else:
-            reward += 5
-
         if service.supply < 2:
             return reward
         if service.demand / service.supply < 0.5 or service.demand / service.supply > 2:
@@ -142,7 +131,7 @@ class PersonAI(Person):
         if 0.9 < service.demand / service.supply < 1.1:
             reward += 20
 
-        reward += service.demand - service.supply
+        reward += (service.demand - service.supply) / service.supply * 30
 
         return reward
 

@@ -45,6 +45,7 @@ def country_actions():
 def service_actions():
     for service in allServices:
         service.adjustPrice()
+        service.costOfNewSupply = random.uniform(max(service.price - 5, 1), service.price + 5)
         service.price = min(service.price, MAX_PRICE)
         if service.seller is allPeople[0]:
             continue
