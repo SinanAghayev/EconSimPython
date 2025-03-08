@@ -13,6 +13,7 @@ from data_types.person_ai_class import PersonAI
 
 from functions.io_functions import *
 
+
 def start():
     allCurrencies.clear()
     allCountries.clear()
@@ -32,7 +33,8 @@ def start():
     set_taxes()
 
     if allPeople[0].__class__ == PersonAI:
-        allPeople[0].initNetworks()
+        allPeople[0].initVariables()
+
 
 def init_currencies():
     if read_from_file:
@@ -67,8 +69,9 @@ def init_services():
         price = random.uniform(1, CEIL_PRICE)
         initialSupply = 10
 
-        # First service is sold by the first person and the rest are sold by random people
-        rnd = random.randint(0, PEOPLE_COUNT - 1)
+        rnd = random.randint(1, PEOPLE_COUNT - 1)
+        if i < 1:
+            rnd = 0
 
         service = Service(
             "Service_" + str(i),
@@ -96,7 +99,6 @@ def init_people():
 
         if i == 0 and aiPersonExists:
             person = PersonAI("Person_" + str(i), age, gender, allCountries[country])
-            person.initNetworks()
         else:
             person = Person("Person_" + str(i), age, gender, allCountries[country])
         allPeople.append(person)
@@ -104,9 +106,11 @@ def init_people():
         # First demand or not, second time of demand
         person.demandedServices = [(False, 0)] * SERVICE_COUNT
 
+
 def set_all_preferences():
     for person in allPeople:
         person.setPreferences()
+
 
 def set_taxes():
     for i in range(COUNTRY_COUNT):

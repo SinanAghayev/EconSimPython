@@ -6,12 +6,20 @@ def update(d):
     day = d
 
     next_iteration()
-    if day % 100 == 0:
-        print("Day: ", day, " Balance: ", allPeople[0].balance)
 
 def next_iteration():
     global day
+    set_all_preferences()
     set_exchange_rates()
+
+    if allPeople[0].__class__ == PersonAI:
+        allPeople[0].decide_action()
+        allPeople[0].apply_action()
+
+    for service in allServices:
+        service.prevRevenue = service.revenue
+        service.revenue = 0
+
     person_actions()
     country_actions()
 
@@ -19,7 +27,8 @@ def next_iteration():
         calculate_inflation()
         currency_actions()
         service_actions()
-        set_all_preferences()
+    if allPeople[0].__class__ == PersonAI:
+        allPeople[0].store_reward()
     day += 1
 
 def set_exchange_rates():
@@ -34,9 +43,10 @@ def calculate_inflation():
 
 def person_actions():
     for person in allPeople:
+        if person.__class__ == PersonAI:
+            continue
         person.personNext()
         person.balance += 1 if person is not allPeople[0] else 0
-    allPeople[0].backpropagate()
 
 def country_actions():
     for country in allCountries:
@@ -46,8 +56,8 @@ def service_actions():
     for service in allServices:
         service.adjustPrice()
         service.costOfNewSupply = random.uniform(max(service.price - 5, 1), service.price + 5)
-        service.price = min(service.price, MAX_PRICE)
-        if service.seller is allPeople[0]:
+        service.price = min(max(service.price, 1), MAX_PRICE)
+        if service.seller.__class__ == allPeople[0]:
             continue
         service.adjustSupply()
 

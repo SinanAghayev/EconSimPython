@@ -1,6 +1,7 @@
 import random
 from .lists import *
 
+
 class Person(object):
     def __init__(self, name, age, gender, country) -> None:
         self.name = name
@@ -44,15 +45,27 @@ class Person(object):
             self.prefService[service] = servicePref
 
             # Demand services that are cheap and have high preference and are not already demanded
-            priceInLocal = service.price * service.currency.exchangeRate[self.country.currency]
-            if not self.demandedServices[service.id][0] and servicePref > self.saveUrge and priceInLocal < self.balance and self.demandedServices[service.id][1] > 7:
+            priceInLocal = (
+                service.price * service.currency.exchangeRate[self.country.currency]
+            )
+            if (
+                not self.demandedServices[service.id][0]
+                and servicePref > self.saveUrge
+                and priceInLocal < self.balance
+                and self.demandedServices[service.id][1] > 3
+            ):
                 service.demand += 1
                 self.demandedServices[service.id] = (True, 0)
-            elif (servicePref < self.saveUrge or priceInLocal > self.balance) and self.demandedServices[service.id][0]:
+            elif (
+                servicePref < self.saveUrge or priceInLocal > self.balance
+            ) and self.demandedServices[service.id][0]:
                 service.demand -= 1
                 self.demandedServices[service.id] = (False, 0)
             elif not self.demandedServices[service.id][0]:
-                self.demandedServices[service.id] = (False, self.demandedServices[service.id][1] + 1)
+                self.demandedServices[service.id] = (
+                    False,
+                    self.demandedServices[service.id][1] + 1,
+                )
 
     def setSaveUrge(self):
         if random.random() < 0.1:
@@ -62,25 +75,31 @@ class Person(object):
     def tryBuying(self):
         bought = []
         for service in self.prefService.keys():
-            if (
-                self.prefService[service] > self.saveUrge
-                and service.supply > 1
-                and random.random() > 0.1
-            ):
-                if self.buy(service):
-                    bought.append(service)
+            if service.supply < 1:
+                continue
+            if self.prefService[service] < self.saveUrge:
+                continue
+            if random.random() < 0.1:
+                continue
+
+            if self.buy(service):
+                bought.append(service)
+
         for s in bought:
             self.prefService[s] *= self.prefService[s]
 
     def buy(self, service):
         priceInLocal = (
-                    service.price * service.currency.exchangeRate[self.country.currency]
+            service.price * service.currency.exchangeRate[self.country.currency]
         )
-        if priceInLocal > self.balance:
+        if priceInLocal * (1 + self.country.importTax[service]) > self.balance:
             return False
         service.can_buy_count += 1
         if self.country != service.originCountry:
             self.country.gdp -= priceInLocal
+
+        if priceInLocal * (1 + self.country.importTax[service]) < 0:
+            print("NEGATIVE PRICE", priceInLocal, self.country.importTax[service])
 
         self.balance -= priceInLocal * (1 + self.country.importTax[service])
         self.country.balance += priceInLocal * self.country.importTax[service]

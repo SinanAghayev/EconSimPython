@@ -15,7 +15,6 @@ class Country(object):
         self.currency.demand += self.balance
 
         self.importTax = {}
-        self.exportTax = {}
 
         self.countryServices = []
         self.inflation = 0
@@ -25,12 +24,14 @@ class Country(object):
 
     def tryBuying(self):
         for service in allServices:
-            if (
-                service.serviceType != TYPE.REGULAR
-                and service.supply > 1
-                and random.uniform(0, 100) < 10
-            ):
-                self.buy(service)
+            if service.serviceType == TYPE.REGULAR:
+                continue
+            elif service.supply <= 1:
+                continue
+            elif random.random() < 0.1:
+                continue
+
+            self.buy(service)
 
     def buy(self, service):
         priceInLocal = service.price * service.currency.exchangeRate[self.currency]
@@ -53,8 +54,6 @@ class Country(object):
     def setTaxes(self):
         for i in range(SERVICE_COUNT):
             self.importTax[allServices[i]] = random.uniform(0, 0.3)
-        for i in range(SERVICE_COUNT):
-            self.exportTax[allServices[i]] = random.uniform(-0.1, 0.1)
 
     def calculateInflation(self):
         currCPI = 0

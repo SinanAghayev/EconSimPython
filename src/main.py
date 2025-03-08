@@ -14,17 +14,60 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 show_index = 0
 
+
 def episode(i):
+    RealTimeGraph.graph_count = 0
     day = 0
     start()
     print(f"Episode {i} started")
 
-    initialize_new_graph(lambda: [person.balance for person in allPeople], PEOPLE_COUNT, "People Balance")
-    initialize_new_graph(lambda: [serv.price for serv in allPeople[show_index].personServices], len(allPeople[show_index].personServices), "Service Price")
-    initialize_new_graph(lambda: [serv.demand for serv in allPeople[show_index].personServices], len(allPeople[show_index].personServices), "Service Demand")
-    initialize_new_graph(lambda: [serv.supply for serv in allPeople[show_index].personServices], len(allPeople[show_index].personServices), "Service Supply")
-    initialize_new_graph(lambda: [serv.bought_recently_count for serv in allPeople[show_index].personServices], len(allPeople[show_index].personServices), "Service Bought Recently Count")
-    initialize_new_graph(lambda: [serv.can_buy_count for serv in allPeople[show_index].personServices], len(allPeople[show_index].personServices), "Service Can Buy Count")
+    p = allPeople[0]
+    initialize_new_graph(
+        lambda: [
+            person.balance / p.country.currency.exchangeRate[person.country.currency]
+            for person in allPeople
+        ],
+        PEOPLE_COUNT,
+        "People Balance",
+    )
+    """
+    initialize_new_graph(
+        lambda: [serv.price for serv in allPeople[show_index].personServices],
+        len(allPeople[show_index].personServices),
+        "Service Price",
+    )
+    initialize_new_graph(
+        lambda: [serv.demand for serv in allPeople[show_index].personServices],
+        len(allPeople[show_index].personServices),
+        "Service Demand",
+    )
+    initialize_new_graph(
+        lambda: [serv.supply for serv in allPeople[show_index].personServices],
+        len(allPeople[show_index].personServices),
+        "Service Supply",
+    )
+    initialize_new_graph(
+        lambda: [
+            serv.bought_recently_count for serv in allPeople[show_index].personServices
+        ],
+        len(allPeople[show_index].personServices),
+        "Service Bought Recently Count",
+    )
+    initialize_new_graph(
+        lambda: [serv.revenue for serv in allPeople[show_index].personServices],
+        len(allPeople[show_index].personServices),
+        "Service Revenue",
+    )"""
+
+    initialize_new_graph(
+        lambda: [c.balance for c in allCountries], COUNTRY_COUNT, "Country Balance"
+    )
+    initialize_new_graph(
+        lambda: [c.inflation for c in allCountries], COUNTRY_COUNT, "Country Inflation"
+    )
+    initialize_new_graph(
+        lambda: [c.value for c in allCurrencies], COUNTRY_COUNT, "Currency Value"
+    )
 
     while True:
         update(day)
@@ -33,16 +76,21 @@ def episode(i):
         check_keyboard()
         after_update()
 
-        print("Day: ", day)
+        # print("Day: ", day)
+        if day % 50 == 0:
+            print("Day: ", day, " Balance: ", allPeople[0].balance)
 
-        if (day + 1) % 50 == 0 and aiPersonExists:
-            allPeople[0].alpha *= 0.9
+        # if (day + 1) % 50 == 0 and aiPersonExists:
+        #     allPeople[0].alpha *= 0.9
         if (day + 1) % MAX_DAY == 0:
             close_graphs()
             print(f"AI balance: {allPeople[0].balance}")
             break
 
         day += 1
+
+    print("Backpropagating...")
+    allPeople[0].backpropagate()
 
 
 print("Starting simulation...")
@@ -59,4 +107,3 @@ while True:
 
     i += 1
     read_from_file = True
-

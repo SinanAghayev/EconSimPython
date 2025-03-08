@@ -1,3 +1,4 @@
+import random
 import keyboard
 import time
 
@@ -21,7 +22,7 @@ def check_keyboard():
     if keyboard.is_pressed("B"):
         keyboard_constants["visualize"] = False
 
-    print("Visualize: ", keyboard_constants["visualize"], " Wait: ", keyboard_constants["wait"])
+    # print("Visualize: ", keyboard_constants["visualize"], " Wait: ", keyboard_constants["wait"])
     if keyboard_constants["wait"]:
         time.sleep(1)
 
@@ -36,21 +37,25 @@ def read_countries_data():
     with open("data/countries.txt", "r") as f:
         for line in f:
             arg = line.strip().split()
-            country = Country(arg[0], allCurrencies[int(arg[1])], int(arg[2]))
+            prosperity = random.randint(1, MAX_PROSPERITY)
+
+            country = Country(arg[0], allCurrencies[int(arg[1])], prosperity)
             allCountries.append(country)
 
 def read_services_data():
     with open("data/services.txt", "r") as f:
             for line in f:
                 arg = line.strip().split()
-                price = float(arg[1])
-                initialSupply = int(arg[2])
+
+                price = random.uniform(1, CEIL_PRICE)
+                initialSupply = 10
+
                 service = Service(
                     arg[0],
                     price,
                     initialSupply,
-                    allPeople[int(arg[3])],
-                    int(arg[4]),
+                    allPeople[int(arg[1])],
+                    int(arg[2]),
                 )
                 allServices.append(service)
 
@@ -76,10 +81,10 @@ def write_data():
             f.write(f"{person.name} {person.age} {person.gender} {allCountries.index(person.country)}\n")
     with open("data/countries.txt", "w") as f:
         for country in allCountries:
-            f.write(f"{country.name} {allCurrencies.index(country.currency)} {country.prosperity}\n")
+            f.write(f"{country.name} {allCurrencies.index(country.currency)}\n")
     with open("data/services.txt", "w") as f:
         for service in allServices:
-            f.write(f"{service.name} {service.price} {int(service.supply)} {allPeople.index(service.seller)} {service.serviceType}\n")
+            f.write(f"{service.name} {allPeople.index(service.seller)} {service.serviceType}\n")
     with open("data/currencies.txt", "w") as f:
         for currency in allCurrencies:
             f.write(f"{currency.name}\n")

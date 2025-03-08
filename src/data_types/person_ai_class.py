@@ -7,70 +7,131 @@ import random
 from data_types.person_class import Person
 from data_types.constants import *
 
+
 class PersonAI(Person):
     def __init__(self, name, age, gender, country):
         super().__init__(name, age, gender, country)
-        self.epsilon = 0.9
+
+    def initVariables(self):
+        self.memory = [[] for _ in self.personServices]
+        self.current_action = [None] * len(self.personServices)
+        self.current_log_prob = [None] * len(self.personServices)
+        self.current_value = [None] * len(self.personServices)
+        self.current_state = [None] * len(self.personServices)
+        self.initNetworks()
 
     def initNetworks(self):
-        self.q_price_networks = []
-        self.q_supply_networks = []
-        self.price_optimizer = []
-        self.supply_optimizer = []
+        self.q_networks = {}
+        self.optimizers = {}
         self.state_dim = 8
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        for i in range(len(self.personServices)):
-            self.q_price_networks.append(create_q_network(self.state_dim, 1, i, "price"))
-            self.q_price_networks[i].to(device)
-            self.q_price_networks[i].train()
+        self.action_dim = 2  # (price change, supply change)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-            self.q_supply_networks.append(create_q_network(self.state_dim, 1, i, "supply"))
-            self.q_supply_networks[i].to(device)
-            self.q_supply_networks[i].train()
+        for service in self.personServices:
+            self.q_networks[service.name] = create_q_network(
+                self.state_dim, self.action_dim, service.name
+            )
+            self.q_networks[service.name].to(device)
+            self.q_networks[service.name].train()
 
-            self.price_optimizer.append(optim.Adam(self.q_price_networks[i].parameters(), lr=0.01))
-            self.supply_optimizer.append(optim.Adam(self.q_supply_networks[i].parameters(), lr=0.01))
+            self.optimizers[service.name] = optim.Adam(
+                self.q_networks[service.name].parameters(), lr=0.01
+            )
 
         self.loss_function = nn.MSELoss()
-        self.alpha = 0.9
-        self.q_price = [None] * len(self.personServices)
-        self.q_supply = [None] * len(self.personServices)
 
-    def personNext(self):
-        for service, i in zip(self.personServices, range(len(self.personServices))):
-            state = torch.tensor(self.get_state(service), dtype=torch.float32)
+    def decide_action(self):
+        for i, service in enumerate(self.personServices):
+            state = self.get_state(service)
+            self.current_state[i] = torch.tensor(state, dtype=torch.float32).unsqueeze(
+                0
+            )
 
-            # Epsilon-greedy action selection for price
-            if random.random() < self.epsilon:
-                self.q_price[i] = self.q_price_networks[i](state)
-            else:
-                self.q_price[i] = torch.tensor([random.uniform(-1, 1)], dtype=torch.float32, requires_grad=True)
+            # Price action
+            mean, std, value = self.q_networks[service.name](self.current_state[i])
+            dist = torch.distributions.Normal(mean, std)
+            action = dist.sample()
+            log_prob = dist.log_prob(action).sum(-1)
 
-            # Epsilon-greedy action selection for supply
-            if random.random() < self.epsilon:
-                self.q_supply[i] = self.q_supply_networks[i](state)
-            else:
-                self.q_supply[i] = torch.tensor([random.uniform(-1, 1)], dtype=torch.float32, requires_grad=True)
+            self.current_action[i] = action
+            self.current_log_prob[i] = log_prob
+            self.current_value[i] = value
 
-            self.take_action(service, self.q_price[i].item(), self.q_supply[i].item())
+    def apply_action(self):
+        for i, service in enumerate(self.personServices):
+            self.take_action(
+                service,
+                self.current_action[i][0][0].item(),
+                self.current_action[i][0][1].item(),
+            )
+
+    def store_reward(self):
+        for i, service in enumerate(self.personServices):
+            reward = self.get_reward(service)
+
+            self.memory[i].append(
+                (
+                    self.current_state[i],
+                    self.current_action[i],
+                    self.current_log_prob[i],
+                    self.current_value[i],
+                    reward,
+                )
+            )
 
     def backpropagate(self):
-        for service, i in zip(self.personServices, range(len(self.personServices))):
+        gamma = 0.99
+        clip_epsilon = 0.2
 
-            # Direct Q-value update using observed reward
-            target_q_price = self.get_price_reward(service)
-            target_q_supply = self.get_supply_reward(service)
+        for i, service in enumerate(self.personServices):
+            for _ in range(4):
+                s_name = service.name
+                self._ppo_update(
+                    self.q_networks[s_name],
+                    self.optimizers[s_name],
+                    self.memory[i],
+                    gamma,
+                    clip_epsilon,
+                )
+            self.memory[i] = []
 
-            loss_price = self.loss_function(self.q_price[i], torch.tensor([target_q_price], dtype=torch.float32))
-            loss_supply = self.loss_function(self.q_supply[i], torch.tensor([target_q_supply], dtype=torch.float32))
+    def _ppo_update(self, network, optimizer, memory, gamma, clip_epsilon):
+        states, actions, log_probs, values, rewards = zip(*memory)
+        states = torch.cat(states)
+        actions = torch.cat(actions)
+        log_probs = torch.cat(log_probs).detach()
+        values = torch.cat(values).squeeze(-1).detach()
+        rewards = torch.tensor(rewards, dtype=torch.float32)
 
-            self.price_optimizer[i].zero_grad()
-            loss_price.backward()
-            self.price_optimizer[i].step()
+        returns = []
+        future_return = 0
 
-            self.supply_optimizer[i].zero_grad()
-            loss_supply.backward()
-            self.supply_optimizer[i].step()
+        for step in reversed(range(len(rewards))):
+            future_return = rewards[step] + gamma * future_return
+            returns.insert(0, future_return)
+
+        returns = torch.tensor(returns, dtype=torch.float32)
+
+        advantages = returns - values.detach()
+
+        # Re-evaluate actions with current policy
+        mean, std, current_values = network(states)
+        # print(f"{states=}")
+        dist = torch.distributions.Normal(mean, std)
+        new_log_probs = dist.log_prob(actions).sum(-1)
+
+        # PPO loss
+        ratio = torch.exp(new_log_probs - log_probs)
+        surr1 = ratio * advantages
+        surr2 = torch.clamp(ratio, 1 - clip_epsilon, 1 + clip_epsilon) * advantages
+        actor_loss = -torch.min(surr1, surr2).mean()
+        critic_loss = ((returns - current_values.squeeze(-1)) ** 2).mean()
+
+        loss = actor_loss + 0.5 * critic_loss - 0.01 * dist.entropy().mean()
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
 
     def get_state(self, service):
         """
@@ -80,83 +141,107 @@ class PersonAI(Person):
         ]
         """
         state = [
-                service.demand,
-                service.supply,
-                service.demand - service.supply,
-                service.price,
-                service.price - service.previousPrice,
-                service.revenue,
-                service.revenue - service.prevRevenue,
-                service.bought_recently_count,
-            ]
+            service.demand / (PEOPLE_COUNT),
+            service.supply / (PEOPLE_COUNT),
+            (service.demand - service.supply) / (PEOPLE_COUNT),
+            service.price / MAX_PRICE,
+            (service.price - service.previousPrice) / MAX_PRICE,
+            service.revenue / (service.price * PEOPLE_COUNT),
+            (service.revenue - service.prevRevenue) / (service.price * PEOPLE_COUNT),
+            service.bought_recently_count / PEOPLE_COUNT,
+        ]
         return state
 
-    def take_action(self, service, price, supply):
-        supply = int(supply)
-        if service.price + price > 0:
-            service.price += price
-        if service.supply + supply < 0:
-            return
-        if self.balance > supply * service.costOfNewSupply:
-            service.supply += supply
-            self.balance -= supply * service.costOfNewSupply
+    def take_action(self, service, price_change, supply_change):
+        supply_change = int(supply_change)
 
-    def get_price_reward(self, service):
+        service.price = max(service.price + price_change, 1)
+
+        if service.supply + supply_change < 0:
+            self.balance += service.supply * service.price / 2
+            service.supply = 0
+        elif self.balance > abs(supply_change) * service.costOfNewSupply:
+            service.supply += supply_change
+            self.balance -= supply_change * service.costOfNewSupply
+
+    def get_reward(self, service):
         reward = 0
 
-        if service.bought_recently_count == 0:
-            reward -= 5
-        else:
-            reward += service.bought_recently_count
+        reward += service.bought_recently_count
 
-        if service.revenue < service.prevRevenue:
-            reward -= 20
-        else:
-            reward += 20
-
-        return reward
-
-    def get_supply_reward(self, service):
-        reward = 0
-
-        if service.revenue < service.prevRevenue:
+        if service.revenue <= 0:
             reward -= 10
+        elif service.revenue < service.prevRevenue:
+            reward -= 1
         else:
             reward += 10
 
-        if service.supply < 2:
+        if service.price < service.costOfNewSupply:
+            reward -= 2
+
+        if max(service.demand, service.supply) == 0:
             return reward
-        if service.demand / service.supply < 0.5 or service.demand / service.supply > 2:
-            reward -= 5
-        if 0.9 < service.demand / service.supply < 1.1:
-            reward += 20
 
-        reward += (service.demand - service.supply) / service.supply * 30
-
+        reward += (
+            (service.demand - service.supply) / max(service.demand, service.supply) * 2
+        )
         return reward
 
     def save(self):
-        for i in range(len(self.q_price_networks)):
-            torch.save(self.q_price_networks[i].state_dict(), f"data/networks/q_price_network{i}.pt")
-            torch.save(self.q_supply_networks[i].state_dict(), f"data/networks/q_supply_network{i}.pt")
-        return
+        for service in self.personServices:
+            torch.save(
+                self.q_networks[service.name].state_dict(),
+                f"data/networks/q_network_{service.name}.pt",
+            )
+
 
 # Define the DNN architecture
 class QNetwork(nn.Module):
     def __init__(self, input_dim, output_dim):
-        super(QNetwork, self).__init__()
-        self.fc1 = nn.Linear(input_dim, 64)
-        self.fc2 = nn.Linear(64, 64)
-        self.fc3 = nn.Linear(64, output_dim)
+        super().__init__()
+        self.actor = nn.Sequential(
+            nn.Linear(input_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, output_dim * 2),  # Mean and LogStd for each action
+        )
+        self.critic = nn.Sequential(
+            nn.Linear(input_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, 1),
+        )
 
-    def forward(self, x):
-        x = torch.relu(self.fc1(x))
-        x = torch.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
+    def forward(self, obs):
+        x = self.actor(obs)
+        mean, log_std = torch.chunk(x, 2, dim=-1)
+        std = torch.exp(log_std).clamp(min=1e-6, max=1000)
 
-def create_q_network(input_dim, output_dim, i, network_type):
-    model = QNetwork(input_dim, output_dim)
-    if os.path.exists(f"data/networks/q_{network_type}_network{i}.pt") and read_networks_from_file:
-        model.load_state_dict(torch.load(f"data/networks/q_{network_type}_network{i}.pt"))
+        if torch.any(torch.isnan(mean)) or torch.any(torch.isinf(mean)):
+            print("M")
+            print(f"Warning: NaN or Inf detected in mean: {mean}")
+            mean = torch.zeros_like(
+                mean
+            )  # Replace NaN or Inf with zeros (or another appropriate value)
+
+        if torch.any(torch.isnan(std)) or torch.any(torch.isinf(std)):
+            print("STD")
+            print(f"Warning: NaN or Inf detected in std: {std}")
+            std = torch.ones_like(
+                std
+            )  # Replace NaN or Inf with ones (or another appropriate value)
+
+        value = self.critic(obs)
+        return mean, std, value
+
+
+def create_q_network(input_dim, action_dim, service_name):
+    model = QNetwork(input_dim, action_dim)
+    if (
+        os.path.exists(f"data/networks/q_network_{service_name}.pt")
+        and read_networks_from_file
+    ):
+        model.load_state_dict(torch.load(f"data/networks/q_network_{service_name}.pt"))
     return model

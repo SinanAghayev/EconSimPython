@@ -63,12 +63,9 @@ class Service(object):
             self.previousPrice = self.price
             if self.supply > 0 and self.demand > 0:
                 self.price = self.basePrice * (self.demand / self.supply)
-        self.prevRevenue = self.revenue
-        self.revenue = 0
 
     def buyThis(self):
-        self.seller.balance += self.price * (1 - self.originCountry.exportTax[self])
-        self.originCountry.balance += self.price * self.originCountry.exportTax[self]
+        self.seller.balance += self.price
 
         self.currency.demand += self.price
 
