@@ -78,7 +78,7 @@ def init_services():
             price,
             initialSupply,
             allPeople[rnd],
-            random.randint(0, 2),
+            random.randint(0, 20),
         )
         allServices.append(service)
 

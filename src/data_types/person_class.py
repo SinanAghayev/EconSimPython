@@ -36,8 +36,8 @@ class Person(object):
                 0.2 * service.agePref[self.age]
                 + 0.2 * service.genderPref[self.gender]
                 + 0.3 * random.random()
-                - 0.2 * (service.price / self.balance)
-                + 0.3 * (service.basePrice - price) / price
+                - 0.2 * ((service.price / self.balance) if self.balance > 0 else 1)
+                + 0.3 * ((service.basePrice - price) / price if price > 0 else 0)
             )
 
             if service.seller == self:

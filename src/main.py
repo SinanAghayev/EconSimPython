@@ -30,22 +30,26 @@ def episode(i):
         PEOPLE_COUNT,
         "People Balance",
     )
-    """
+    """"""
     initialize_new_graph(
         lambda: [serv.price for serv in allPeople[show_index].personServices],
         len(allPeople[show_index].personServices),
         "Service Price",
     )
+    """
     initialize_new_graph(
         lambda: [serv.demand for serv in allPeople[show_index].personServices],
         len(allPeople[show_index].personServices),
         "Service Demand",
-    )
+    )"""
     initialize_new_graph(
-        lambda: [serv.supply for serv in allPeople[show_index].personServices],
+        lambda: [
+            serv.supplyBeforeSales for serv in allPeople[show_index].personServices
+        ],
         len(allPeople[show_index].personServices),
         "Service Supply",
     )
+
     initialize_new_graph(
         lambda: [
             serv.bought_recently_count for serv in allPeople[show_index].personServices
@@ -53,12 +57,13 @@ def episode(i):
         len(allPeople[show_index].personServices),
         "Service Bought Recently Count",
     )
+    """
     initialize_new_graph(
         lambda: [serv.revenue for serv in allPeople[show_index].personServices],
         len(allPeople[show_index].personServices),
         "Service Revenue",
     )"""
-
+    """
     initialize_new_graph(
         lambda: [c.balance for c in allCountries], COUNTRY_COUNT, "Country Balance"
     )
@@ -67,6 +72,9 @@ def episode(i):
     )
     initialize_new_graph(
         lambda: [c.value for c in allCurrencies], COUNTRY_COUNT, "Currency Value"
+    )"""
+    initialize_new_graph_3d(
+        lambda: mean_std,  # Assuming the first person is the AI
     )
 
     while True:

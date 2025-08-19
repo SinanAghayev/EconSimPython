@@ -15,18 +15,19 @@ keyboard_constants = {
     "visualize": True,  # If True, the program will display the graphs
 }
 
-COUNTRY_COUNT = 3  # Number of countries
-SERVICE_COUNT = 100  # Number of services
-PEOPLE_COUNT = 300  # Number of people
+COUNTRY_COUNT = 4  # Number of countries
+SERVICE_COUNT = 500  # Number of services
+PEOPLE_COUNT = 500  # Number of people
 CEIL_PRICE = 500  # Maximum starting price of a service
 MAX_PRICE = 100000  # Maximum price of a service
 MAX_PROSPERITY = 20  # Maximum prosperity of a country
-MAX_DAY = 128  # Maximum number of days the simulation will run for
+MAX_DAY = 50  # Maximum number of days the simulation will run for
+MAX_SUPPLY = 1000  # Maximum supply of a service
 INTERVAL = 1  # Number of days between each update
 
 
 aiPersonExists = True  # If True, the program will create an AI person. If False, the program will not create an AI person.
 read_from_file = False  # If True, the program will read from the data files. If False, the program will generate new data.
-read_networks_from_file = False  # If True, the program will read the neural network data from the files. If False, the program will generate new neural networks.
+read_networks_from_file = True  # If True, the program will read the neural network data from the files. If False, the program will generate new neural networks.
 
 MAX_GRAPH_DATA_POINTS = 50  # This is the maximum number of data points that can be displayed on the graph at once

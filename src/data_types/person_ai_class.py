@@ -6,6 +6,7 @@ import random
 
 from data_types.person_class import Person
 from data_types.constants import *
+from data_types.lists import *
 
 
 class PersonAI(Person):
@@ -49,6 +50,9 @@ class PersonAI(Person):
 
             # Price action
             mean, std, value = self.q_networks[service.name](self.current_state[i])
+            ####### TODO This is for graph purposes, remove later
+            mean_std[0] = (mean[0][0].item(), std[0][0].item())
+            ####### TODO This is for graph purposes, remove later
             dist = torch.distributions.Normal(mean, std)
             action = dist.sample()
             log_prob = dist.log_prob(action).sum(-1)
@@ -153,9 +157,24 @@ class PersonAI(Person):
         return state
 
     def take_action(self, service, price_change, supply_change):
-        supply_change = int(supply_change)
+        if random.random() < 0.2:
+            price_change = random.uniform(0.7, 10)
+        if random.random() < 0.2:
+            supply_change = random.randint(0, 5)
 
-        service.price = max(service.price + price_change, 1)
+        ## price_change = price_change * MAX_PRICE
+        supply_change = int(supply_change * MAX_SUPPLY)
+
+        service.price = max(service.price * price_change, 1)
+        if service.supply + supply_change > MAX_SUPPLY:
+            supply_change = MAX_SUPPLY - service.supply
+
+        print(
+            f"Taking action on {service.name}: price_change={price_change}, supply_change={supply_change}"
+        )
+        print(f"Current supply: {service.supply} Current price: {service.price}")
+        print(f"Balance before action: {self.balance}")
+        print()
 
         if service.supply + supply_change < 0:
             self.balance += service.supply * service.price / 2
@@ -163,6 +182,10 @@ class PersonAI(Person):
         elif self.balance > abs(supply_change) * service.costOfNewSupply:
             service.supply += supply_change
             self.balance -= supply_change * service.costOfNewSupply
+        else:
+            service.supply += self.balance // service.costOfNewSupply
+            self.balance = 0
+        service.supplyBeforeSales = service.supply
 
     def get_reward(self, service):
         reward = 0

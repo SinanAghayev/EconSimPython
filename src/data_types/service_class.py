@@ -43,6 +43,8 @@ class Service(object):
         self.bought_recently_count = 0
         self.can_buy_count = 0
 
+        self.supplyBeforeSales = self.supply
+
     def adjustSupply(self):
         if self.supply * 2 < self.demand:
             self.invest()
