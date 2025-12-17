@@ -2,8 +2,10 @@ import os
 import random
 import shutil
 
-from data_types.constants import *
-from data_types.lists import *
+import data_types.constants as constants
+import data_types.config as config
+import data_types.data_collections as data_collections
+import data_types.enums as enums
 
 from data_types.currency_class import Currency
 from data_types.country_class import Country
@@ -11,107 +13,110 @@ from data_types.service_class import Service
 from data_types.person_class import Person
 from data_types.person_ai_class import PersonAI
 
-from functions.io_functions import *
+import update_functions
+import io_functions
 
 
 def start():
-    allCurrencies.clear()
-    allCountries.clear()
-    allPeople.clear()
-    allServices.clear()
+    data_collections.all_currencies.clear()
+    data_collections.all_countries.clear()
+    data_collections.all_people.clear()
+    data_collections.all_services.clear()
 
     init_currencies()
-
-    for i in range(COUNTRY_COUNT):
-        for j in range(COUNTRY_COUNT):
-            allCurrencies[i].exchangeRate[allCurrencies[j]] = 1
 
     init_countries()
     init_people()
     init_services()
-    set_all_preferences()
+    update_functions.evaluate_all_services()
     set_taxes()
 
-    if allPeople[0].__class__ == PersonAI:
-        allPeople[0].initVariables()
+    if isinstance(data_collections.all_people[0], PersonAI):
+        data_collections.all_people[0].initVariables()
 
 
 def init_currencies():
-    if read_from_file:
-        read_currencies_data()
-        return
+    if config.READ_FROM_FILE:
+        io_functions.read_currencies_from_file()
+    else:
+        for i in range(constants.COUNTRY_COUNT):
+            currency = Currency("Currency_" + str(i))
+            data_collections.all_currencies.append(currency)
 
-    for i in range(COUNTRY_COUNT):
-        currency = Currency("Currency_" + str(i))
-        allCurrencies.append(currency)
+    # Set exchange rates all to 1
+    for i in range(constants.COUNTRY_COUNT):
+        for j in range(constants.COUNTRY_COUNT):
+            data_collections.all_currencies[i].exchange_rate[
+                data_collections.all_currencies[j]
+            ] = 1
 
 
 def init_countries():
-    if read_from_file:
-        read_countries_data()
+    if config.READ_FROM_FILE:
+        io_functions.read_countries_from_file()
         return
 
-    for i in range(COUNTRY_COUNT):
-        prosperity = random.randint(1, MAX_PROSPERITY)
-        country = Country("Country_" + str(i), allCurrencies[i], prosperity)
-        allCountries.append(country)
+    for i in range(constants.COUNTRY_COUNT):
+        prosperity = random.randint(1, constants.MAX_PROSPERITY)
+
+        country = Country(
+            "Country_" + str(i), data_collections.all_currencies[i], prosperity
+        )
+        data_collections.all_countries.append(country)
 
 
 def init_services():
     Service.service_id = 0
 
-    if read_from_file:
-        read_services_data()
+    if config.READ_FROM_FILE:
+        io_functions.read_services_from_file()
         return
 
-    Service.service_id = 0
-    for i in range(SERVICE_COUNT):
-        price = random.uniform(1, CEIL_PRICE)
-        initialSupply = 10
-
-        rnd = random.randint(1, PEOPLE_COUNT - 1)
-        if i < 1:
+    for i in range(constants.SERVICE_COUNT):
+        rnd = random.randint(1, constants.PEOPLE_COUNT - 1)
+        if i < 1:  # First x services are given to AI
             rnd = 0
+
+        price = random.uniform(1, constants.CEIL_PRICE)
+        initial_supply = 10
+        seller = data_collections.allPeople[rnd]
 
         service = Service(
             "Service_" + str(i),
             price,
-            initialSupply,
-            allPeople[rnd],
-            random.randint(0, 20),
+            initial_supply,
+            seller,
+            random.choice(list(enums.ServiceConsumerType)),
         )
-        allServices.append(service)
+        data_collections.all_services.append(service)
 
 
 def init_people():
-    if read_from_file:
-        read_people_data()
+    if config.READ_FROM_FILE:
+        io_functions.read_people_from_file()
         return
 
     if os.path.exists("networks"):
         shutil.rmtree("networks")
     os.mkdir("networks")
 
-    for i in range(PEOPLE_COUNT):
-        age = random.randint(0, 3)
-        gender = random.randint(0, 1)
-        country = random.randint(0, COUNTRY_COUNT - 1)
+    for i in range(constants.PEOPLE_COUNT):
+        age_group = random.choice(list(enums.AgeGroup))
+        gender = random.choice(list(enums.Gender))
+        country = data_collections.all_countries[
+            random.randint(0, constants.COUNTRY_COUNT - 1)
+        ]
 
-        if i == 0 and aiPersonExists:
-            person = PersonAI("Person_" + str(i), age, gender, allCountries[country])
+        if i == 0 and config.AI_PERSON_EXISTS:
+            person = PersonAI("Person_" + str(i), age_group, gender, country)
         else:
-            person = Person("Person_" + str(i), age, gender, allCountries[country])
-        allPeople.append(person)
+            person = Person("Person_" + str(i), age_group, gender, country)
+        data_collections.all_people.append(person)
 
-        # First demand or not, second time of demand
-        person.demandedServices = [(False, 0)] * SERVICE_COUNT
-
-
-def set_all_preferences():
-    for person in allPeople:
-        person.setPreferences()
+        # First "demand or not", second "time of demand"
+        person.service_demand_state = [(False, 0)] * constants.SERVICE_COUNT
 
 
 def set_taxes():
-    for i in range(COUNTRY_COUNT):
-        allCountries[i].setTaxes()
+    for i in range(constants.COUNTRY_COUNT):
+        data_collections.all_countries[i].set_taxes()

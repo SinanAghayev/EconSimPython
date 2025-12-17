@@ -2,8 +2,10 @@ import random
 import keyboard
 import time
 
-from data_types.constants import *
-from data_types.lists import *
+import data_types.config as config
+import data_types.data_collections as data_collections
+import data_types.constants as constants
+import data_types.enums as enums
 
 from data_types.currency_class import Currency
 from data_types.country_class import Country
@@ -11,80 +13,97 @@ from data_types.service_class import Service
 from data_types.person_class import Person
 from data_types.person_ai_class import PersonAI
 
+
 def check_keyboard():
     if keyboard.is_pressed("A"):
-        keyboard_constants["wait"] = False
+        config.WAIT_FOR_INPUT = False
     if keyboard.is_pressed("S"):
-        keyboard_constants["wait"] = True
+        config.WAIT_FOR_INPUT = True
 
     if keyboard.is_pressed("V"):
-        keyboard_constants["visualize"] = True
+        config.VISUALIZE_GRAPHS = True
     if keyboard.is_pressed("B"):
-        keyboard_constants["visualize"] = False
+        config.VISUALIZE_GRAPHS = False
 
-    # print("Visualize: ", keyboard_constants["visualize"], " Wait: ", keyboard_constants["wait"])
-    if keyboard_constants["wait"]:
+    if config.WAIT_FOR_INPUT:
         time.sleep(1)
 
-def read_currencies_data():
+
+def read_currencies_from_file():
     with open("data/currencies.txt", "r") as f:
         for line in f:
             arg = line.strip().split()
-            currency = Currency(arg[0])
-            allCurrencies.append(currency)
+            currency_name = arg[0]
+            currency = Currency(currency_name)
+            data_collections.all_currencies.append(currency)
 
-def read_countries_data():
+
+def read_countries_from_file():
     with open("data/countries.txt", "r") as f:
         for line in f:
             arg = line.strip().split()
-            prosperity = random.randint(1, MAX_PROSPERITY)
+            prosperity = random.randint(1, constants.MAX_PROSPERITY)
 
-            country = Country(arg[0], allCurrencies[int(arg[1])], prosperity)
-            allCountries.append(country)
+            country_name = arg[0]
+            country_currency = data_collections.all_currencies[int(arg[1])]
+            country = Country(country_name, country_currency, prosperity)
+            data_collections.all_countries.append(country)
 
-def read_services_data():
+
+def read_services_from_file():
     with open("data/services.txt", "r") as f:
-            for line in f:
-                arg = line.strip().split()
+        for line in f:
+            arg = line.strip().split()
 
-                price = random.uniform(1, CEIL_PRICE)
-                initialSupply = 10
+            service_name = arg[0]
+            price = random.uniform(1, constants.CEIL_PRICE)
+            initial_supply = 10
+            customer_type = enums.ServiceConsumerType[arg[2]]
+            seller = data_collections.all_people[int(arg[1])]
 
-                service = Service(
-                    arg[0],
-                    price,
-                    initialSupply,
-                    allPeople[int(arg[1])],
-                    int(arg[2]),
-                )
-                allServices.append(service)
+            service = Service(
+                service_name,
+                price,
+                initial_supply,
+                seller,
+                customer_type,
+            )
+            data_collections.all_services.append(service)
 
-def read_people_data():
+
+def read_people_from_file():
     with open("data/people.txt", "r") as f:
-            for i, line in enumerate(f):
-                arg = line.strip().split()
-                name = arg[0]
-                age = int(arg[1])
-                gender = int(arg[2])
-                country = allCountries[int(arg[3])]
-                if i == 0 and aiPersonExists:
-                    person = PersonAI(name, age, gender, country)
-                else:
-                    person = Person(name, age, gender, country)
-                allPeople.append(person)
+        for i, line in enumerate(f):
+            arg = line.strip().split()
+            name = arg[0]
+            age = int(arg[1])
+            gender = int(arg[2])
+            country = data_collections.all_people[int(arg[3])]
+            if i == 0 and config.AI_PERSON_EXISTS:
+                person = PersonAI(name, age, gender, country)
+            else:
+                person = Person(name, age, gender, country)
+            data_collections.all_people.append(person)
 
-                person.demandedServices = [(0, 0)] * SERVICE_COUNT
+            person.demandedServices = [(0, 0)] * constants.SERVICE_COUNT
 
-def write_data():
+
+def write_data_to_file():
     with open("data/people.txt", "w") as f:
-        for person in allPeople:
-            f.write(f"{person.name} {person.age} {person.gender} {allCountries.index(person.country)}\n")
+        for person in data_collections.all_people:
+            f.write(
+                f"{person.name} {person.age} {person.gender} {data_collections.all_countries.index(person.country)}\n"
+            )
     with open("data/countries.txt", "w") as f:
-        for country in allCountries:
-            f.write(f"{country.name} {allCurrencies.index(country.currency)}\n")
+        for country in data_collections.all_countries:
+            f.write(
+                f"{country.name} {data_collections.all_currencies.index(country.currency)}\n"
+            )
     with open("data/services.txt", "w") as f:
-        for service in allServices:
-            f.write(f"{service.name} {allPeople.index(service.seller)} {service.serviceType}\n")
+        for service in data_collections.all_services:
+            f.write(
+                f"{service.name} {data_collections.all_people.index(service.seller)} {service.consumer_type.name}\n"
+            )
     with open("data/currencies.txt", "w") as f:
-        for currency in allCurrencies:
+        for currency in data_collections.all_currencies:
             f.write(f"{currency.name}\n")

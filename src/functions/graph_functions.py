@@ -1,7 +1,8 @@
 import tkinter as tk
-from functions.graph import *
+import matplotlib.pyplot as plt
 
-from data_types.lists import *
+from functions.graph import RealTimeGraph, RealTimeGraph3D
+from data_types.graph_state import graph_apps, graph_roots, graph_update_lists
 
 
 def initialize_new_graph(update_function, size, title=""):
@@ -10,7 +11,6 @@ def initialize_new_graph(update_function, size, title=""):
 
     graph_roots.append(root)
     graph_apps.append(g)
-
     graph_update_lists.append(update_function)
 
 
