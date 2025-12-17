@@ -4,21 +4,20 @@ import torch.nn as nn
 import torch.optim as optim
 import random
 
-from data_types.person_class import Person
-from data_types.constants import *
-from data_types.lists import *
+import constants
+import data_collections
+import statistics
+from person_class import Person
 
 
 class PersonAI(Person):
-    def __init__(self, name, age, gender, country):
-        super().__init__(name, age, gender, country)
-
     def initVariables(self):
-        self.memory = [[] for _ in self.personServices]
-        self.current_action = [None] * len(self.personServices)
-        self.current_log_prob = [None] * len(self.personServices)
-        self.current_value = [None] * len(self.personServices)
-        self.current_state = [None] * len(self.personServices)
+        service_count = len(self.provided_services)
+        self.memory = [[] * service_count]
+        self.current_action = [None] * service_count
+        self.current_log_prob = [None] * service_count
+        self.current_value = [None] * service_count
+        self.current_state = [None] * service_count
         self.initNetworks()
 
     def initNetworks(self):
