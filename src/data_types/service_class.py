@@ -1,8 +1,5 @@
 import random
-from enums import ServiceConsumerType
-from src.data_types.person_ai_class import PersonAI
-from src.data_types.country_class import Country
-from src.data_types.person_class import Person
+from src.data_types.enums import ServiceConsumerType, AgeGroup, Gender
 from src.data_types.currency_class import Currency
 
 
@@ -54,8 +51,6 @@ class Service(object):
     supply: int
     new_supply: int
     cost_of_new_supply: float
-    origin_country: Country
-    seller: Person
     currency: Currency
     consumer_type: ServiceConsumerType
     age_preference: dict[int, float]
@@ -71,7 +66,7 @@ class Service(object):
         name: str,
         base_price: float,
         initial_supply: int,
-        seller: Person,
+        seller,
         consumer_type: ServiceConsumerType,
     ) -> None:
         self.id = Service.service_id
@@ -86,7 +81,7 @@ class Service(object):
         self.currency = self.origin_country.currency
 
         self.seller = seller
-        self.seller.person_services.append(self)
+        self.seller.provided_services.append(self)
 
         self.consumer_type = consumer_type
 
@@ -101,11 +96,11 @@ class Service(object):
         )  # TODO: Need more complex algorithm to compute this.
 
         self.age_preference = {}
-        for i in range(4):
+        for i in AgeGroup:
             self.age_preference[i] = random.random()
 
         self.gender_preference = {}
-        for i in range(2):
+        for i in Gender:
             self.gender_preference[i] = random.random()
 
         self.previous_revenue = 0
@@ -134,8 +129,6 @@ class Service(object):
 
     def adjust_price(self):
         """Adjust price based on current supply and demand levels."""
-        if isinstance(self.seller, PersonAI):
-            return
 
         # Not always
         if random.random() < 0.1:

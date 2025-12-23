@@ -1,8 +1,8 @@
 import random
-from enums import AgeGroup, Gender
-from country_class import Country
-from service_class import Service
-import data_collections
+from src.data_types.enums import AgeGroup, Gender
+from src.data_types.country_class import Country
+from src.data_types.service_class import Service
+import src.data_types.data_collections as data_collections
 
 
 class Person(object):
@@ -141,8 +141,8 @@ class Person(object):
 
     def update_save_urge(self):
         if random.random() < 0.05:
-            self.save_urge *= self.prevBalance / self.balance
-        self.saveUrge = min(self.saveUrge, 0.8)
+            self.save_urge *= self.previous_balance / self.balance
+        self.save_urge = min(self.save_urge, 0.8)
 
     def try_buying(self):
         bought = []

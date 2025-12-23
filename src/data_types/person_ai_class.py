@@ -9,6 +9,7 @@ import src.data_types.config as config
 import src.data_types.data_collections as data_collections
 import src.data_types.statistics as statistics
 from src.data_types.person_class import Person
+from src.data_types.service_class import Service
 
 
 class PersonAI(Person):
@@ -28,7 +29,7 @@ class PersonAI(Person):
         self.action_dim = 2  # (price change, supply change)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        for service in self.personServices:
+        for service in self.provided_services:
             self.q_networks[service.name] = create_q_network(
                 self.state_dim, self.action_dim, service.name
             )
@@ -42,7 +43,7 @@ class PersonAI(Person):
         self.loss_function = nn.MSELoss()
 
     def decide_action(self):
-        for i, service in enumerate(self.personServices):
+        for i, service in enumerate(self.provided_services):
             state = self.get_state(service)
             self.current_state[i] = torch.tensor(state, dtype=torch.float32).unsqueeze(
                 0
@@ -62,7 +63,7 @@ class PersonAI(Person):
             self.current_value[i] = value
 
     def apply_action(self):
-        for i, service in enumerate(self.personServices):
+        for i, service in enumerate(self.provided_services):
             self.take_action(
                 service,
                 self.current_action[i][0][0].item(),
@@ -70,7 +71,7 @@ class PersonAI(Person):
             )
 
     def store_reward(self):
-        for i, service in enumerate(self.personServices):
+        for i, service in enumerate(self.provided_services):
             reward = self.get_reward(service)
 
             self.memory[i].append(
@@ -87,7 +88,7 @@ class PersonAI(Person):
         gamma = 0.99
         clip_epsilon = 0.2
 
-        for i, service in enumerate(self.personServices):
+        for i, service in enumerate(self.provided_services):
             for _ in range(4):
                 s_name = service.name
                 self._ppo_update(
@@ -137,7 +138,7 @@ class PersonAI(Person):
         loss.backward()
         optimizer.step()
 
-    def get_state(self, service):
+    def get_state(self, service: Service):
         """
         state = [
             self.balance,
@@ -149,15 +150,15 @@ class PersonAI(Person):
             service.supply / (constants.PEOPLE_COUNT),
             (service.demand - service.supply) / (constants.PEOPLE_COUNT),
             service.price / constants.MAX_PRICE,
-            (service.price - service.previousPrice) / constants.MAX_PRICE,
+            (service.price - service.previous_price) / constants.MAX_PRICE,
             service.revenue / (service.price * constants.PEOPLE_COUNT),
-            (service.revenue - service.prevRevenue)
+            (service.revenue - service.previous_revenue)
             / (service.price * constants.PEOPLE_COUNT),
             service.bought_recently_count / constants.PEOPLE_COUNT,
         ]
         return state
 
-    def take_action(self, service, price_change, supply_change):
+    def take_action(self, service: Service, price_change, supply_change):
         if random.random() < 0.2:
             price_change = random.uniform(0.7, 10)
         if random.random() < 0.2:
@@ -180,27 +181,27 @@ class PersonAI(Person):
         if service.supply + supply_change < 0:
             self.balance += service.supply * service.price / 2
             service.supply = 0
-        elif self.balance > abs(supply_change) * service.costOfNewSupply:
+        elif self.balance > abs(supply_change) * service.cost_of_new_supply:
             service.supply += supply_change
-            self.balance -= supply_change * service.costOfNewSupply
+            self.balance -= supply_change * service.cost_of_new_supply
         else:
-            service.supply += self.balance // service.costOfNewSupply
+            service.supply += self.balance // service.cost_of_new_supply
             self.balance = 0
-        service.supplyBeforeSales = service.supply
+        service.supply_before_sales = service.supply
 
-    def get_reward(self, service):
+    def get_reward(self, service: Service):
         reward = 0
 
         reward += service.bought_recently_count
 
         if service.revenue <= 0:
             reward -= 10
-        elif service.revenue < service.prevRevenue:
+        elif service.revenue < service.previous_revenue:
             reward -= 1
         else:
             reward += 10
 
-        if service.price < service.costOfNewSupply:
+        if service.price < service.cost_of_new_supply:
             reward -= 2
 
         if max(service.demand, service.supply) == 0:
@@ -212,7 +213,7 @@ class PersonAI(Person):
         return reward
 
     def save(self):
-        for service in self.personServices:
+        for service in self.provided_services:
             torch.save(
                 self.q_networks[service.name].state_dict(),
                 f"data/networks/q_network_{service.name}.pt",

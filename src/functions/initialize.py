@@ -79,7 +79,7 @@ def init_services():
 
         price = random.uniform(1, constants.CEIL_PRICE)
         initial_supply = 10
-        seller = data_collections.allPeople[rnd]
+        seller = data_collections.all_people[rnd]
 
         service = Service(
             "Service_" + str(i),

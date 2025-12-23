@@ -49,8 +49,12 @@ def set_exchange_rates():
         for j in range(constants.COUNTRY_COUNT):
             other_currency = data_collections.all_currencies[j]
 
-            rate = currency.value / other_currency.value
-            currency.exchangeRate[other_currency] = rate
+            rate = (
+                1
+                if other_currency.value == 0
+                else currency.value / other_currency.value
+            )
+            currency.exchange_rate[other_currency] = rate
 
 
 def calculate_inflation():
@@ -80,7 +84,7 @@ def service_actions():
         service.price = min(max(service.price, 1), constants.MAX_PRICE)
         if isinstance(service.seller, PersonAI):
             continue
-        service.adjustSupply()
+        service.adjust_supply()
 
 
 def currency_actions():

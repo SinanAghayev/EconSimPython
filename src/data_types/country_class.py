@@ -1,6 +1,7 @@
 import random
 import src.data_types.constants as constants
 import src.data_types.data_collections as data_collections
+import src.data_types.enums as enums
 from src.data_types.currency_class import Currency
 from src.data_types.service_class import Service
 
@@ -54,7 +55,7 @@ class Country(object):
     def try_buying(self) -> None:
         """Find services that can be bought and try buying them"""
         for service in data_collections.all_services:
-            if service.service_type == constants.TargetType.REGULAR:
+            if service.consumer_type == enums.ServiceConsumerType.REGULAR:
                 continue
             elif service.supply < 1:
                 continue
@@ -87,7 +88,7 @@ class Country(object):
     def set_taxes(self):
         """Sets the taxes randomly"""
         for i in range(constants.SERVICE_COUNT):
-            self.importTax[data_collections.all_services[i]] = random.uniform(0, 0.3)
+            self.import_taxes[data_collections.all_services[i]] = random.uniform(0, 0.3)
 
     def calculate_inflation(self):
         """
@@ -96,14 +97,14 @@ class Country(object):
         # TODO: This is wrong, not all sold items are originated in this country.
         """
 
-        previous_CPI = 0
+        current_CPI = 0
         previous_CPI = 0
         for service in self.country_services:
             current_CPI += service.price
-            previous_CPI += service.previousPrice
+            previous_CPI += service.previous_price
 
         if previous_CPI == 0:
             self.inflation = 0
             return
 
-        self.inflation = ((previous_CPI - previous_CPI) / previous_CPI) * 100
+        self.inflation = ((current_CPI - previous_CPI) / previous_CPI) * 100

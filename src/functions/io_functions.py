@@ -76,13 +76,13 @@ def read_people_from_file():
         for i, line in enumerate(f):
             arg = line.strip().split()
             name = arg[0]
-            age = int(arg[1])
-            gender = int(arg[2])
+            age_group = arg[1]
+            gender = arg[2]
             country = data_collections.all_people[int(arg[3])]
             if i == 0 and config.AI_PERSON_EXISTS:
-                person = PersonAI(name, age, gender, country)
+                person = PersonAI(name, age_group, gender, country)
             else:
-                person = Person(name, age, gender, country)
+                person = Person(name, age_group, gender, country)
             data_collections.all_people.append(person)
 
             person.demandedServices = [(0, 0)] * constants.SERVICE_COUNT
@@ -92,7 +92,7 @@ def write_data_to_file():
     with open("data/people.txt", "w") as f:
         for person in data_collections.all_people:
             f.write(
-                f"{person.name} {person.age} {person.gender} {data_collections.all_countries.index(person.country)}\n"
+                f"{person.name} {person.age_group} {person.gender} {data_collections.all_countries.index(person.country)}\n"
             )
     with open("data/countries.txt", "w") as f:
         for country in data_collections.all_countries:
