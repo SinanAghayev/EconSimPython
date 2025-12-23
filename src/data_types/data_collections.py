@@ -1,7 +1,7 @@
-from country_class import Country
-from currency_class import Currency
-from person_class import Person
-from service_class import Service
+from src.data_types.country_class import Country
+from src.data_types.currency_class import Currency
+from src.data_types.person_class import Person
+from src.data_types.service_class import Service
 
 
 all_countries: list[Country] = []

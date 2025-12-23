@@ -1,10 +1,9 @@
 import random
-import constants
 from enums import ServiceConsumerType
-from person_ai_class import PersonAI
-from country_class import Country
-from person_class import Person
-from currency_class import Currency
+from src.data_types.person_ai_class import PersonAI
+from src.data_types.country_class import Country
+from src.data_types.person_class import Person
+from src.data_types.currency_class import Currency
 
 
 class Service(object):

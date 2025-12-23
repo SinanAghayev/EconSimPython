@@ -1,13 +1,9 @@
 import random
 
-import data_types.constants as constants
-import data_types.data_collections as data_collections
+import src.data_types.constants as constants
+import src.data_types.data_collections as data_collections
 
-from data_types.currency_class import Currency
-from data_types.country_class import Country
-from data_types.service_class import Service
-from data_types.person_class import Person
-from data_types.person_ai_class import PersonAI
+from src.data_types.person_ai_class import PersonAI
 
 
 def update(d):

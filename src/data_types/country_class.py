@@ -1,8 +1,8 @@
 import random
-import constants
-import data_collections
-from currency_class import Currency
-from service_class import Service
+import src.data_types.constants as constants
+import src.data_types.data_collections as data_collections
+from src.data_types.currency_class import Currency
+from src.data_types.service_class import Service
 
 
 class Country(object):

@@ -2,19 +2,19 @@ import os
 import random
 import shutil
 
-import data_types.constants as constants
-import data_types.config as config
-import data_types.data_collections as data_collections
-import data_types.enums as enums
+import src.data_types.constants as constants
+import src.data_types.config as config
+import src.data_types.data_collections as data_collections
+import src.data_types.enums as enums
 
-from data_types.currency_class import Currency
-from data_types.country_class import Country
-from data_types.service_class import Service
-from data_types.person_class import Person
-from data_types.person_ai_class import PersonAI
+from src.data_types.currency_class import Currency
+from src.data_types.country_class import Country
+from src.data_types.service_class import Service
+from src.data_types.person_class import Person
+from src.data_types.person_ai_class import PersonAI
 
-import update_functions
-import io_functions
+import src.functions.update_functions as update_functions
+import src.functions.io_functions as io_functions
 
 
 def start():

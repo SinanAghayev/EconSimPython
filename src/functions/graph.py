@@ -1,8 +1,8 @@
 import tkinter as tk
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-import data_types.constants as constants
+import src.data_types.constants as constants
 
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np

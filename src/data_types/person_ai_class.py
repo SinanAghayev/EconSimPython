@@ -4,10 +4,11 @@ import torch.nn as nn
 import torch.optim as optim
 import random
 
-import constants
-import data_collections
-import statistics
-from person_class import Person
+import src.data_types.constants as constants
+import src.data_types.config as config
+import src.data_types.data_collections as data_collections
+import src.data_types.statistics as statistics
+from src.data_types.person_class import Person
 
 
 class PersonAI(Person):
@@ -50,7 +51,7 @@ class PersonAI(Person):
             # Price action
             mean, std, value = self.q_networks[service.name](self.current_state[i])
             ####### TODO This is for graph purposes, remove later
-            mean_std[0] = (mean[0][0].item(), std[0][0].item())
+            statistics.mean_std[0] = (mean[0][0].item(), std[0][0].item())
             ####### TODO This is for graph purposes, remove later
             dist = torch.distributions.Normal(mean, std)
             action = dist.sample()
@@ -144,14 +145,15 @@ class PersonAI(Person):
         ]
         """
         state = [
-            service.demand / (PEOPLE_COUNT),
-            service.supply / (PEOPLE_COUNT),
-            (service.demand - service.supply) / (PEOPLE_COUNT),
-            service.price / MAX_PRICE,
-            (service.price - service.previousPrice) / MAX_PRICE,
-            service.revenue / (service.price * PEOPLE_COUNT),
-            (service.revenue - service.prevRevenue) / (service.price * PEOPLE_COUNT),
-            service.bought_recently_count / PEOPLE_COUNT,
+            service.demand / (constants.PEOPLE_COUNT),
+            service.supply / (constants.PEOPLE_COUNT),
+            (service.demand - service.supply) / (constants.PEOPLE_COUNT),
+            service.price / constants.MAX_PRICE,
+            (service.price - service.previousPrice) / constants.MAX_PRICE,
+            service.revenue / (service.price * constants.PEOPLE_COUNT),
+            (service.revenue - service.prevRevenue)
+            / (service.price * constants.PEOPLE_COUNT),
+            service.bought_recently_count / constants.PEOPLE_COUNT,
         ]
         return state
 
@@ -162,11 +164,11 @@ class PersonAI(Person):
             supply_change = random.randint(0, 5)
 
         ## price_change = price_change * MAX_PRICE
-        supply_change = int(supply_change * MAX_SUPPLY)
+        supply_change = int(supply_change * constants.MAX_SUPPLY)
 
         service.price = max(service.price * price_change, 1)
-        if service.supply + supply_change > MAX_SUPPLY:
-            supply_change = MAX_SUPPLY - service.supply
+        if service.supply + supply_change > constants.MAX_SUPPLY:
+            supply_change = constants.MAX_SUPPLY - service.supply
 
         print(
             f"Taking action on {service.name}: price_change={price_change}, supply_change={supply_change}"
@@ -263,7 +265,7 @@ def create_q_network(input_dim, action_dim, service_name):
     model = QNetwork(input_dim, action_dim)
     if (
         os.path.exists(f"data/networks/q_network_{service_name}.pt")
-        and read_networks_from_file
+        and config.READ_NETWORKS_FROM_FILE
     ):
         model.load_state_dict(torch.load(f"data/networks/q_network_{service_name}.pt"))
     return model

@@ -1,13 +1,16 @@
 import sys
 import os
 
-from data_types.constants import *
-from data_types.lists import *
+import src.data_types.constants as constants
+import src.data_types.config as config
+import src.data_types.statistics as statistics
+import src.data_types.data_collections as data_collections
 
-from functions.initialize import *
-from functions.update_functions import *
-from functions.io_functions import *
-from functions.graph_functions import *
+import src.functions.initialize as initialize
+import src.functions.update_functions as update_functions
+import src.functions.io_functions as io_functions
+import src.functions.graph_functions as graph_functions
+from src.functions.graph import RealTimeGraph
 
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -18,22 +21,25 @@ show_index = 0
 def episode(i):
     RealTimeGraph.graph_count = 0
     day = 0
-    start()
+    initialize.start()
     print(f"Episode {i} started")
 
-    p = allPeople[0]
-    initialize_new_graph(
+    p = data_collections.all_people[0]
+    graph_functions.initialize_new_graph(
         lambda: [
             person.balance / p.country.currency.exchangeRate[person.country.currency]
-            for person in allPeople
+            for person in data_collections.all_people
         ],
-        PEOPLE_COUNT,
+        constants.PEOPLE_COUNT,
         "People Balance",
     )
     """"""
-    initialize_new_graph(
-        lambda: [serv.price for serv in allPeople[show_index].personServices],
-        len(allPeople[show_index].personServices),
+    graph_functions.initialize_new_graph(
+        lambda: [
+            serv.price
+            for serv in data_collections.all_people[show_index].personServices
+        ],
+        len(data_collections.all_people[show_index].personServices),
         "Service Price",
     )
     """
@@ -42,19 +48,21 @@ def episode(i):
         len(allPeople[show_index].personServices),
         "Service Demand",
     )"""
-    initialize_new_graph(
+    graph_functions.initialize_new_graph(
         lambda: [
-            serv.supplyBeforeSales for serv in allPeople[show_index].personServices
+            serv.supplyBeforeSales
+            for serv in data_collections.all_people[show_index].personServices
         ],
-        len(allPeople[show_index].personServices),
+        len(data_collections.all_people[show_index].personServices),
         "Service Supply",
     )
 
-    initialize_new_graph(
+    graph_functions.initialize_new_graph(
         lambda: [
-            serv.bought_recently_count for serv in allPeople[show_index].personServices
+            serv.bought_recently_count
+            for serv in data_collections.all_people[show_index].personServices
         ],
-        len(allPeople[show_index].personServices),
+        len(data_collections.all_people[show_index].personServices),
         "Service Bought Recently Count",
     )
     """
@@ -73,32 +81,32 @@ def episode(i):
     initialize_new_graph(
         lambda: [c.value for c in allCurrencies], COUNTRY_COUNT, "Currency Value"
     )"""
-    initialize_new_graph_3d(
-        lambda: mean_std,  # Assuming the first person is the AI
+    graph_functions.initialize_new_graph_3d(
+        lambda: statistics.mean_std,  # Assuming the first person is the AI
     )
 
     while True:
-        update(day)
-        if keyboard_constants["visualize"]:
-            update_graphs(day)
-        check_keyboard()
-        after_update()
+        update_functions.update(day)
+        if config.VISUALIZE_GRAPHS:
+            update_functions.update_graphs(day)
+        io_functions.check_keyboard()
+        update_functions.after_update()
 
         # print("Day: ", day)
         if day % 50 == 0:
-            print("Day: ", day, " Balance: ", allPeople[0].balance)
+            print("Day: ", day, " Balance: ", data_collections.all_people[0].balance)
 
         # if (day + 1) % 50 == 0 and aiPersonExists:
         #     allPeople[0].alpha *= 0.9
-        if (day + 1) % MAX_DAY == 0:
-            close_graphs()
-            print(f"AI balance: {allPeople[0].balance}")
+        if (day + 1) % constants.MAX_DAY == 0:
+            graph_functions.close_graphs()
+            print(f"AI balance: {data_collections.all_people[0].balance}")
             break
 
         day += 1
 
     print("Backpropagating...")
-    allPeople[0].backpropagate()
+    data_collections.all_people[0].backpropagate()
 
 
 print("Starting simulation...")
@@ -107,10 +115,10 @@ while True:
     episode(i)
     print(f"Episode {i} finished")
 
-    allPeople[0].save()
+    data_collections.all_people[0].save()
     print("Network data saved")
 
-    write_data()
+    io_functions.write_data_to_file()
     print("Data written to files")
 
     i += 1
