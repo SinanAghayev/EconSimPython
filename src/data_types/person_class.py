@@ -181,10 +181,15 @@ class Person(object):
             return False
 
         if tax_included_local_price < 0:
+            return False
             print(
                 "NEGATIVE PRICE",
+                service.price,
+                service.currency.exchange_rate[self.country.currency],
                 price_in_local_currency,
                 self.country.import_taxes[service],
+                self.name,
+                service.seller.name,
             )
             return False
 

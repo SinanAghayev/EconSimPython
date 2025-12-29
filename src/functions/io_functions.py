@@ -76,9 +76,9 @@ def read_people_from_file():
         for i, line in enumerate(f):
             arg = line.strip().split()
             name = arg[0]
-            age_group = arg[1]
-            gender = arg[2]
-            country = data_collections.all_people[int(arg[3])]
+            age_group = enums.AgeGroup[arg[1]]
+            gender = enums.Gender[arg[2]]
+            country = data_collections.all_countries[int(arg[3])]
             if i == 0 and config.AI_PERSON_EXISTS:
                 person = PersonAI(name, age_group, gender, country)
             else:
@@ -92,7 +92,7 @@ def write_data_to_file():
     with open("data/people.txt", "w") as f:
         for person in data_collections.all_people:
             f.write(
-                f"{person.name} {person.age_group} {person.gender} {data_collections.all_countries.index(person.country)}\n"
+                f"{person.name} {person.age_group.name} {person.gender.name} {data_collections.all_countries.index(person.country)}\n"
             )
     with open("data/countries.txt", "w") as f:
         for country in data_collections.all_countries:

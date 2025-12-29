@@ -27,4 +27,5 @@ class Currency(object):
 
     def adjust_value(self):
         """Adjusts the value of the currecy depending on demand and supply"""
-        self.value = 0 if self.supply == 0 else self.demand / self.supply
+        self.demand = max(0, self.demand)
+        self.value = 0 if self.supply <= 0 else self.demand / self.supply

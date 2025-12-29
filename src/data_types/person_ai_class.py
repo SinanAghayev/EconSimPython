@@ -3,270 +3,376 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import random
+import numpy as np
+from collections import deque
 
 import src.data_types.constants as constants
 import src.data_types.config as config
 import src.data_types.data_collections as data_collections
-import src.data_types.statistics as statistics
 from src.data_types.person_class import Person
 from src.data_types.service_class import Service
 
 
 class PersonAI(Person):
     def initVariables(self):
-        service_count = len(self.provided_services)
-        self.memory = [[] * service_count]
-        self.current_action = [None] * service_count
-        self.current_log_prob = [None] * service_count
-        self.current_value = [None] * service_count
-        self.current_state = [None] * service_count
-        self.initNetworks()
+        # PPO hyperparameters
+        self.gamma = 0.99  # Discount factor
+        self.gae_lambda = 0.95  # GAE lambda
+        self.clip_epsilon = 0.2  # PPO clip parameter
+        self.entropy_coef = 0.01  # Entropy bonus coefficient
+        self.value_coef = 0.5  # Value loss coefficient
+        self.max_grad_norm = 0.5  # Gradient clipping
+        self.n_epochs = 4  # Number of epochs per update
+        self.mini_batch_size = 64  # Mini-batch size for updates
+        self.update_frequency = 128  # Steps before policy update
 
-    def initNetworks(self):
-        self.q_networks = {}
-        self.optimizers = {}
+        # Network architecture
         self.state_dim = 8
         self.action_dim = 2  # (price change, supply change)
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        for service in self.provided_services:
-            self.q_networks[service.name] = create_q_network(
-                self.state_dim, self.action_dim, service.name
-            )
-            self.q_networks[service.name].to(device)
-            self.q_networks[service.name].train()
+        # Initialize policy network
+        self.policy = ActorCritic(self.state_dim, self.action_dim)
+        self.optimizer = optim.Adam(self.policy.parameters(), lr=3e-4)
 
-            self.optimizers[service.name] = optim.Adam(
-                self.q_networks[service.name].parameters(), lr=0.01
-            )
+        # Memory for storing trajectories
+        self.memory = PPOMemory()
 
-        self.loss_function = nn.MSELoss()
-
-    def decide_action(self):
-        for i, service in enumerate(self.provided_services):
-            state = self.get_state(service)
-            self.current_state[i] = torch.tensor(state, dtype=torch.float32).unsqueeze(
-                0
-            )
-
-            # Price action
-            mean, std, value = self.q_networks[service.name](self.current_state[i])
-            ####### TODO This is for graph purposes, remove later
-            statistics.mean_std[0] = (mean[0][0].item(), std[0][0].item())
-            ####### TODO This is for graph purposes, remove later
-            dist = torch.distributions.Normal(mean, std)
-            action = dist.sample()
-            log_prob = dist.log_prob(action).sum(-1)
-
-            self.current_action[i] = action
-            self.current_log_prob[i] = log_prob
-            self.current_value[i] = value
-
-    def apply_action(self):
-        for i, service in enumerate(self.provided_services):
-            self.take_action(
-                service,
-                self.current_action[i][0][0].item(),
-                self.current_action[i][0][1].item(),
-            )
-
-    def store_reward(self):
-        for i, service in enumerate(self.provided_services):
-            reward = self.get_reward(service)
-
-            self.memory[i].append(
-                (
-                    self.current_state[i],
-                    self.current_action[i],
-                    self.current_log_prob[i],
-                    self.current_value[i],
-                    reward,
-                )
-            )
-
-    def backpropagate(self):
-        gamma = 0.99
-        clip_epsilon = 0.2
-
-        for i, service in enumerate(self.provided_services):
-            for _ in range(4):
-                s_name = service.name
-                self._ppo_update(
-                    self.q_networks[s_name],
-                    self.optimizers[s_name],
-                    self.memory[i],
-                    gamma,
-                    clip_epsilon,
-                )
-            self.memory[i] = []
-
-    def _ppo_update(self, network, optimizer, memory, gamma, clip_epsilon):
-        states, actions, log_probs, values, rewards = zip(*memory)
-        states = torch.cat(states)
-        actions = torch.cat(actions)
-        log_probs = torch.cat(log_probs).detach()
-        values = torch.cat(values).squeeze(-1).detach()
-        rewards = torch.tensor(rewards, dtype=torch.float32)
-
-        returns = []
-        future_return = 0
-
-        for step in reversed(range(len(rewards))):
-            future_return = rewards[step] + gamma * future_return
-            returns.insert(0, future_return)
-
-        returns = torch.tensor(returns, dtype=torch.float32)
-
-        advantages = returns - values.detach()
-
-        # Re-evaluate actions with current policy
-        mean, std, current_values = network(states)
-        # print(f"{states=}")
-        dist = torch.distributions.Normal(mean, std)
-        new_log_probs = dist.log_prob(actions).sum(-1)
-
-        # PPO loss
-        ratio = torch.exp(new_log_probs - log_probs)
-        surr1 = ratio * advantages
-        surr2 = torch.clamp(ratio, 1 - clip_epsilon, 1 + clip_epsilon) * advantages
-        actor_loss = -torch.min(surr1, surr2).mean()
-        critic_loss = ((returns - current_values.squeeze(-1)) ** 2).mean()
-
-        loss = actor_loss + 0.5 * critic_loss - 0.01 * dist.entropy().mean()
-
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        # Training statistics
+        self.steps_since_update = 0
+        self.episode_rewards = []
 
     def get_state(self, service: Service):
-        """
+        """Convert service state to normalized feature vector"""
         state = [
-            self.balance,
-            self.balance - self.prevBalance,
-        ]
-        """
-        state = [
-            service.demand / (constants.PEOPLE_COUNT),
-            service.supply / (constants.PEOPLE_COUNT),
-            (service.demand - service.supply) / (constants.PEOPLE_COUNT),
-            service.price / constants.MAX_PRICE,
-            (service.price - service.previous_price) / constants.MAX_PRICE,
-            service.revenue / (service.price * constants.PEOPLE_COUNT),
+            service.demand / (constants.PEOPLE_COUNT + 1e-8),
+            service.supply / (constants.PEOPLE_COUNT + 1e-8),
+            (service.demand - service.supply) / (constants.PEOPLE_COUNT + 1e-8),
+            service.price / (constants.MAX_PRICE + 1e-8),
+            (service.price - service.previous_price) / (constants.MAX_PRICE + 1e-8),
+            service.revenue / (service.price * constants.PEOPLE_COUNT + 1e-8),
             (service.revenue - service.previous_revenue)
-            / (service.price * constants.PEOPLE_COUNT),
-            service.bought_recently_count / constants.PEOPLE_COUNT,
+            / (service.price * constants.PEOPLE_COUNT + 1e-8),
+            service.bought_recently_count / (constants.PEOPLE_COUNT + 1e-8),
         ]
-        return state
+        return np.array(state, dtype=np.float32)
 
-    def take_action(self, service: Service, price_change, supply_change):
-        if random.random() < 0.2:
-            price_change = random.uniform(0.7, 10)
-        if random.random() < 0.2:
-            supply_change = random.randint(0, 5)
+    def decide_action(self):
+        """Sample actions from the policy for all services"""
+        self.current_actions = {}
+        self.current_log_probs = {}
+        self.current_values = {}
+        self.current_states = {}
 
-        ## price_change = price_change * MAX_PRICE
-        supply_change = int(supply_change * constants.MAX_SUPPLY)
+        for service in self.provided_services:
+            state = self.get_state(service)
+            state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
 
-        service.price = max(service.price * price_change, 1)
-        if service.supply + supply_change > constants.MAX_SUPPLY:
-            supply_change = constants.MAX_SUPPLY - service.supply
+            # Get policy predictions
+            with torch.no_grad():
+                mean, std, value = self.policy(state_tensor)
+                dist = torch.distributions.Normal(mean, std)
+                action = dist.sample()
+                log_prob = dist.log_prob(action).sum(dim=-1)
 
-        print(
-            f"Taking action on {service.name}: price_change={price_change}, supply_change={supply_change}"
-        )
-        print(f"Current supply: {service.supply} Current price: {service.price}")
-        print(f"Balance before action: {self.balance}")
-        print()
+            # Store for later use
+            self.current_states[service.name] = state
+            self.current_actions[service.name] = action.squeeze(0)
+            self.current_log_probs[service.name] = log_prob.squeeze(0)
+            self.current_values[service.name] = value.squeeze(0)
 
-        if service.supply + supply_change < 0:
-            self.balance += service.supply * service.price / 2
-            service.supply = 0
-        elif self.balance > abs(supply_change) * service.cost_of_new_supply:
-            service.supply += supply_change
-            self.balance -= supply_change * service.cost_of_new_supply
-        else:
-            service.supply += self.balance // service.cost_of_new_supply
-            self.balance = 0
-        service.supply_before_sales = service.supply
+    def apply_action(self):
+        """Apply the sampled actions to services"""
+        for service in self.provided_services:
+            action = self.current_actions[service.name]
+
+            # Convert action from [-1, 1] range to actual changes
+            delta_price = action[0].item() * constants.MAX_PRICE_CHANGE
+            delta_supply = action[1].item() * constants.MAX_SUPPLY_CHANGE
+
+            # Apply price change with bounds
+            new_price = service.price + delta_price
+            service.price = np.clip(new_price, constants.MIN_PRICE, constants.MAX_PRICE)
+
+            # Apply supply change with cost consideration
+            supply_cost = max(0, delta_supply) * service.cost_of_new_supply
+
+            if delta_supply > 0 and self.balance >= supply_cost:
+                # Buying new supply
+                service.supply += int(delta_supply)
+                self.balance -= supply_cost
+            elif delta_supply < 0:
+                # Reducing supply (sell back at half cost)
+                reduction = int(abs(delta_supply))
+                actual_reduction = min(reduction, service.supply)
+                service.supply -= actual_reduction
+                self.balance += actual_reduction * service.cost_of_new_supply * 0.5
+
+            # Ensure supply is non-negative
+            service.supply = max(0, service.supply)
+
+    def store_reward(self):
+        """Store transitions in memory after actions are taken"""
+        for service in self.provided_services:
+            reward = self.get_reward(service)
+
+            self.memory.store(
+                state=torch.tensor(
+                    self.current_states[service.name], dtype=torch.float32
+                ),
+                action=self.current_actions[service.name],
+                log_prob=self.current_log_probs[service.name],
+                value=self.current_values[service.name],
+                reward=reward,
+                done=False,  # You can set this based on episode termination
+            )
+
+        self.steps_since_update += 1
+
+    def should_update(self):
+        """Check if we have enough data to perform a policy update"""
+        return self.steps_since_update >= self.update_frequency
+
+    def update_policy(self):
+        """Perform PPO update on collected trajectories"""
+        if len(self.memory.states) == 0:
+            return
+
+        # Convert memory to tensors
+        states = torch.stack(self.memory.states)
+        actions = torch.stack(self.memory.actions)
+        old_log_probs = torch.stack(self.memory.log_probs).detach()
+        values = torch.stack(self.memory.values).squeeze(-1).detach()
+        rewards = torch.tensor(self.memory.rewards, dtype=torch.float32)
+        dones = torch.tensor(self.memory.dones, dtype=torch.float32)
+
+        # Compute returns and advantages using GAE
+        returns, advantages = self.compute_gae(rewards, values, dones)
+
+        # Normalize advantages
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+
+        # Multiple epochs of optimization
+        dataset_size = len(states)
+
+        for epoch in range(self.n_epochs):
+            # Shuffle indices for mini-batch sampling
+            indices = np.arange(dataset_size)
+            np.random.shuffle(indices)
+
+            # Process mini-batches
+            for start in range(0, dataset_size, self.mini_batch_size):
+                end = min(start + self.mini_batch_size, dataset_size)
+                batch_indices = indices[start:end]
+
+                # Get mini-batch data
+                batch_states = states[batch_indices]
+                batch_actions = actions[batch_indices]
+                batch_old_log_probs = old_log_probs[batch_indices]
+                batch_advantages = advantages[batch_indices]
+                batch_returns = returns[batch_indices]
+                batch_values = values[batch_indices]
+
+                # Forward pass
+                mean, std, new_values = self.policy(batch_states)
+                dist = torch.distributions.Normal(mean, std)
+                new_log_probs = dist.log_prob(batch_actions).sum(dim=-1)
+                entropy = dist.entropy().mean()
+
+                # Compute PPO actor loss
+                ratio = torch.exp(new_log_probs - batch_old_log_probs)
+                surr1 = ratio * batch_advantages
+                surr2 = (
+                    torch.clamp(ratio, 1.0 - self.clip_epsilon, 1.0 + self.clip_epsilon)
+                    * batch_advantages
+                )
+                actor_loss = -torch.min(surr1, surr2).mean()
+
+                # Compute clipped value loss
+                new_values_squeezed = new_values.squeeze(-1)
+                value_pred_clipped = batch_values + torch.clamp(
+                    new_values_squeezed - batch_values,
+                    -self.clip_epsilon,
+                    self.clip_epsilon,
+                )
+                value_loss_unclipped = (batch_returns - new_values_squeezed).pow(2)
+                value_loss_clipped = (batch_returns - value_pred_clipped).pow(2)
+                critic_loss = (
+                    0.5 * torch.max(value_loss_unclipped, value_loss_clipped).mean()
+                )
+
+                # Total loss
+                loss = (
+                    actor_loss
+                    + self.value_coef * critic_loss
+                    - self.entropy_coef * entropy
+                )
+
+                # Optimization step
+                self.optimizer.zero_grad()
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(
+                    self.policy.parameters(), self.max_grad_norm
+                )
+                self.optimizer.step()
+
+        # Clear memory after update
+        self.memory.clear()
+        self.steps_since_update = 0
+
+    def compute_gae(self, rewards, values, dones):
+        """Compute Generalized Advantage Estimation"""
+        advantages = []
+        gae = 0
+
+        # Add a zero value for the terminal state
+        next_values = torch.cat([values[1:], torch.tensor([0.0])])
+
+        for t in reversed(range(len(rewards))):
+            # TD error
+            delta = (
+                rewards[t] + self.gamma * next_values[t] * (1 - dones[t]) - values[t]
+            )
+
+            # GAE
+            gae = delta + self.gamma * self.gae_lambda * (1 - dones[t]) * gae
+            advantages.insert(0, gae)
+
+        advantages = torch.tensor(advantages, dtype=torch.float32)
+        returns = advantages + values
+
+        return returns, advantages
 
     def get_reward(self, service: Service):
-        reward = 0
+        """Compute reward for a service based on performance"""
+        reward = 0.0
 
+        # Reward for units sold
         reward += service.bought_recently_count
 
-        if service.revenue <= 0:
-            reward -= 10
+        # Revenue-based reward
+        if service.revenue > service.previous_revenue:
+            reward += 4.0
         elif service.revenue < service.previous_revenue:
-            reward -= 1
-        else:
-            reward += 10
+            reward -= 1.0
 
+        # Penalize zero revenue
+        if service.revenue <= 0:
+            reward -= 10.0
+
+        # Penalize pricing below cost
         if service.price < service.cost_of_new_supply:
-            reward -= 2
+            reward -= 3.0
 
-        if max(service.demand, service.supply) == 0:
-            return reward
+        # Reward for meeting demand (supply-demand balance)
+        if max(service.demand, service.supply) > 0:
+            # Penalize excess supply
+            if service.supply > service.demand:
+                excess_ratio = (service.supply - service.demand) / (
+                    service.supply + 1e-8
+                )
+                reward -= excess_ratio * 1.0
 
-        reward += (
-            (service.demand - service.supply) / max(service.demand, service.supply) * 2
-        )
+        # Reward for maintaining stock
+        if service.supply > 0:
+            reward += 3.0
+
         return reward
 
     def save(self):
-        for service in self.provided_services:
-            torch.save(
-                self.q_networks[service.name].state_dict(),
-                f"data/networks/q_network_{service.name}.pt",
-            )
+        """Save the policy network"""
+        save_dir = "data/networks"
+        os.makedirs(save_dir, exist_ok=True)
+
+        checkpoint = {
+            "policy_state_dict": self.policy.state_dict(),
+            "optimizer_state_dict": self.optimizer.state_dict(),
+            "episode_rewards": self.episode_rewards,
+        }
+
+        torch.save(checkpoint, f"{save_dir}/ppo_agent.pt")
+        print(f"Model saved to {save_dir}/ppo_agent.pt")
+
+    def load(self):
+        """Load the policy network"""
+        checkpoint_path = "data/networks/ppo_agent.pt"
+
+        if os.path.exists(checkpoint_path):
+            checkpoint = torch.load(checkpoint_path)
+            self.policy.load_state_dict(checkpoint["policy_state_dict"])
+            self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+            self.episode_rewards = checkpoint.get("episode_rewards", [])
+            print(f"Model loaded from {checkpoint_path}")
+        else:
+            print(f"No checkpoint found at {checkpoint_path}, starting fresh")
 
 
-# Define the DNN architecture
-class QNetwork(nn.Module):
+class ActorCritic(nn.Module):
+    """Actor-Critic network for PPO"""
+
     def __init__(self, input_dim, output_dim):
         super().__init__()
-        self.actor = nn.Sequential(
-            nn.Linear(input_dim, 64),
+
+        # Shared feature extraction
+        self.shared = nn.Sequential(
+            nn.Linear(input_dim, 128),
             nn.ReLU(),
-            nn.Linear(64, 64),
-            nn.ReLU(),
-            nn.Linear(64, output_dim * 2),  # Mean and LogStd for each action
         )
-        self.critic = nn.Sequential(
-            nn.Linear(input_dim, 64),
+
+        # Actor network (policy)
+        self.actor_mean = nn.Sequential(
+            nn.Linear(128, 64),
             nn.ReLU(),
-            nn.Linear(64, 64),
+            nn.Linear(64, output_dim),
+            nn.Tanh(),  # Output in [-1, 1]
+        )
+
+        # Learnable log standard deviation
+        self.log_std = nn.Parameter(torch.zeros(output_dim))
+
+        # Critic network (value function)
+        self.critic = nn.Sequential(
+            nn.Linear(128, 64),
             nn.ReLU(),
             nn.Linear(64, 1),
         )
 
     def forward(self, obs):
-        x = self.actor(obs)
-        mean, log_std = torch.chunk(x, 2, dim=-1)
-        std = torch.exp(log_std).clamp(min=1e-6, max=1000)
+        """Forward pass through both actor and critic"""
+        shared_features = self.shared(obs)
 
-        if torch.any(torch.isnan(mean)) or torch.any(torch.isinf(mean)):
-            print("M")
-            print(f"Warning: NaN or Inf detected in mean: {mean}")
-            mean = torch.zeros_like(
-                mean
-            )  # Replace NaN or Inf with zeros (or another appropriate value)
+        # Actor outputs
+        mean = self.actor_mean(shared_features)
+        std = torch.exp(self.log_std).clamp(min=1e-6, max=2.0)
 
-        if torch.any(torch.isnan(std)) or torch.any(torch.isinf(std)):
-            print("STD")
-            print(f"Warning: NaN or Inf detected in std: {std}")
-            std = torch.ones_like(
-                std
-            )  # Replace NaN or Inf with ones (or another appropriate value)
+        # Critic output
+        value = self.critic(shared_features)
 
-        value = self.critic(obs)
         return mean, std, value
 
 
-def create_q_network(input_dim, action_dim, service_name):
-    model = QNetwork(input_dim, action_dim)
-    if (
-        os.path.exists(f"data/networks/q_network_{service_name}.pt")
-        and config.READ_NETWORKS_FROM_FILE
-    ):
-        model.load_state_dict(torch.load(f"data/networks/q_network_{service_name}.pt"))
-    return model
+class PPOMemory:
+    """Memory buffer for storing trajectories"""
+
+    def __init__(self):
+        self.states = []
+        self.actions = []
+        self.log_probs = []
+        self.values = []
+        self.rewards = []
+        self.dones = []
+
+    def store(self, state, action, log_prob, value, reward, done=False):
+        """Store a single transition"""
+        self.states.append(state)
+        self.actions.append(action)
+        self.log_probs.append(log_prob)
+        self.values.append(value)
+        self.rewards.append(reward)
+        self.dones.append(done)
+
+    def clear(self):
+        """Clear all stored transitions"""
+        self.__init__()
+
+    def __len__(self):
+        return len(self.states)

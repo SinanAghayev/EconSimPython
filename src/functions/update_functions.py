@@ -17,12 +17,8 @@ def next_iteration():
     evaluate_all_services()
     set_exchange_rates()
 
-    first_person = data_collections.all_people[0]
-    if isinstance(first_person, PersonAI):
-        first_person.decide_action()
-        first_person.apply_action()
-
     for service in data_collections.all_services:
+        service.supply_before_sales = service.supply
         service.previous_revenue = service.revenue
         service.revenue = 0
 
@@ -33,9 +29,6 @@ def next_iteration():
         calculate_inflation()
         currency_actions()
         service_actions()
-    if isinstance(first_person, PersonAI):
-        first_person.store_reward()
-    day += 1
 
 
 def evaluate_all_services():
@@ -51,9 +44,19 @@ def set_exchange_rates():
 
             rate = (
                 1
-                if other_currency.value == 0
-                else currency.value / other_currency.value
+                if other_currency.demand == 0
+                else currency.demand / other_currency.demand
             )
+            if rate < 0:
+                print(
+                    "First currency: ", currency.value, currency.demand, currency.supply
+                )
+                print(
+                    "Other currency: ",
+                    other_currency.value,
+                    other_currency.demand,
+                    other_currency.supply,
+                )
             currency.exchange_rate[other_currency] = rate
 
 
@@ -77,13 +80,13 @@ def country_actions():
 
 def service_actions():
     for service in data_collections.all_services:
+        if isinstance(service.seller, PersonAI):
+            continue
         service.adjust_price()
         service.cost_of_new_supply = random.uniform(
             max(service.price - 5, 1), service.price + 5
         )
         service.price = min(max(service.price, 1), constants.MAX_PRICE)
-        if isinstance(service.seller, PersonAI):
-            continue
         service.adjust_supply()
 
 

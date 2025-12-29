@@ -24,7 +24,6 @@ def start():
     data_collections.all_services.clear()
 
     init_currencies()
-
     init_countries()
     init_people()
     init_services()
@@ -74,7 +73,7 @@ def init_services():
 
     for i in range(constants.SERVICE_COUNT):
         rnd = random.randint(1, constants.PEOPLE_COUNT - 1)
-        if i < 1:  # First x services are given to AI
+        if i < 5:  # First x services are given to AI
             rnd = 0
 
         price = random.uniform(1, constants.CEIL_PRICE)

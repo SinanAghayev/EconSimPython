@@ -6,7 +6,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import src.data_types.constants as constants
 import src.data_types.config as config
-import src.data_types.statistics as statistics
 import src.data_types.data_collections as data_collections
 
 import src.functions.initialize as initialize
@@ -28,6 +27,7 @@ def episode(i):
     print(f"Episode {i} started")
 
     p = data_collections.all_people[0]
+    # Balance of people
     graph_functions.initialize_new_graph(
         lambda: [
             person.balance / p.country.currency.exchange_rate[person.country.currency]
@@ -36,7 +36,7 @@ def episode(i):
         constants.PEOPLE_COUNT,
         "People Balance",
     )
-    """"""
+    # Prices of services of given person
     graph_functions.initialize_new_graph(
         lambda: [
             service.price
@@ -45,7 +45,7 @@ def episode(i):
         len(data_collections.all_people[show_index].provided_services),
         "Service Price",
     )
-
+    # Demands of services of given person
     graph_functions.initialize_new_graph(
         lambda: [
             service.demand
@@ -54,6 +54,7 @@ def episode(i):
         len(data_collections.all_people[show_index].provided_services),
         "Service Demand",
     )
+    # Supplies of services of given person
     graph_functions.initialize_new_graph(
         lambda: [
             service.supply_before_sales
@@ -62,7 +63,7 @@ def episode(i):
         len(data_collections.all_people[show_index].provided_services),
         "Service Supply",
     )
-
+    # Count of recently bought services of given person
     graph_functions.initialize_new_graph(
         lambda: [
             serv.bought_recently_count
@@ -71,6 +72,7 @@ def episode(i):
         len(data_collections.all_people[show_index].provided_services),
         "Service Bought Recently Count",
     )
+    # Revenues from services of given person
     graph_functions.initialize_new_graph(
         lambda: [
             service.revenue
@@ -85,36 +87,44 @@ def episode(i):
     )
     initialize_new_graph(
         lambda: [c.inflation for c in allCountries], COUNTRY_COUNT, "Country Inflation"
-    )
-    initialize_new_graph(
-        lambda: [c.value for c in allCurrencies], COUNTRY_COUNT, "Currency Value"
     )"""
-    graph_functions.initialize_new_graph_3d(
-        lambda: statistics.mean_std,  # Assuming the first person is the AI
+    graph_functions.initialize_new_graph(
+        lambda: [c.value for c in data_collections.all_currencies],
+        constants.COUNTRY_COUNT,
+        "Currency Value",
     )
+
+    agent = data_collections.all_people[0]
 
     while True:
+        agent.decide_action()
+        agent.apply_action()
+
         update_functions.update(day)
-        if config.VISUALIZE_GRAPHS:
-            graph_functions.update_graphs(day)
-        io_functions.check_keyboard()
         update_functions.after_update()
 
-        # print("Day: ", day)
+        agent.store_reward()
+        if agent.should_update():
+            agent.update_policy()
+
+        # Visualizing
+        if config.VISUALIZE_GRAPHS:
+            graph_functions.update_graphs(day)
+
+        # IO Functions
+        io_functions.check_keyboard()
+
+        # Printing
         if day % 50 == 0:
             print("Day: ", day, " Balance: ", data_collections.all_people[0].balance)
 
-        # if (day + 1) % 50 == 0 and aiPersonExists:
-        #     allPeople[0].alpha *= 0.9
+        # Do finishing simulation operations
         if (day + 1) % constants.MAX_DAY == 0:
             graph_functions.close_graphs()
             print(f"AI balance: {data_collections.all_people[0].balance}")
             break
 
         day += 1
-
-    print("Backpropagating...")
-    data_collections.all_people[0].backpropagate()
 
 
 print("Starting simulation...")
