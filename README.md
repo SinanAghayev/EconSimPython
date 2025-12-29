@@ -1,51 +1,86 @@
-# EconSimPython
+# RL-Based Economic Simulation
 
-EconSimPython is a simulation project designed to model economic interactions between individuals in a simplified environment. It focuses on the dynamics of supply and demand, service pricing, and the balance of individuals over time.
+This project is an agent-based economic simulation that models supply–demand dynamics, pricing strategies, and capital constraints in a simplified market environment. The project explores how reinforcement learning agents (PPO) adapt pricing and supply decisions over time based on market feedback.
 
-## Features
+## Project Motivation
 
-- **Dynamic Economic Simulation**: Models the economic interactions between individuals, tracking variables such as balance, service price, demand, and supply.
-- **Graphical Visualization**: Provides real-time graphs to visualize the changes in people's balance, service price, demand, and supply throughout the simulation.
-- **Adaptive AI**: Includes an AI character whose decision-making parameters adapt over time based on economic conditions.
-- **Interactive Control**: Allows users to interact with the simulation in real-time using keyboard inputs to visualize different aspects of the economy.
+The goal of this project is to simulate bounded rational economic agents and observe how pricing, production, and balance evolve under realistic constraints such as limited capital, changing demand, and over- or under-supply penalties.
+
+Rather than using fixed heuristics, agents learn their strategies through interaction with the environment.
+
+## Key Features
+
+- **Agent-Based Economic Simulation:** Individuals provide services with dynamic pricing and supply. Demand emerges from population behavior, and capital and production costs constrain decisions.
+
+- **Reinforcement Learning (PPO):** Actor–Critic architecture using Proximal Policy Optimization with a continuous action space for price and supply adjustments. Reward shaping is based on revenue, demand fulfillment, and sustainability.
+
+- **Adaptive AI Agents:** Agents learn pricing and production strategies over time, balancing exploration and exploitation via entropy regularization. A shared policy is used across multiple services per agent.
+
+- **Real-Time Visualization:** Live graphs display the evolution of price, demand, supply, and balance during the simulation. Visualization can be toggled at runtime.
+
+- **Interactive Simulation Control:** Core economic parameters can be modified via configuration files, and keyboard controls allow switching between visualization modes.
+
+## Technical Stack
+
+Python  
+PyTorch (PPO, Actor–Critic)  
+NumPy  
+Matplotlib  
+Custom entity-based simulation framework  
 
 ## Getting Started
-
 ### Prerequisites
 
-- Python 3.x
-- Matplotlib for graphing
-- Other Python libraries as required (full list in `requirements.txt`)
+Python 3.x  
+Required packages listed in requirements.txt  
 
 ### Installation
 
-1. Clone the repository to your local machine:
+Clone the repository:
 
-   `git clone https://github.com/yourusername/EconSimPython.git`
+`git clone https://github.com/yourusername/EconSimPython.git`
 
-2. Navigate to the cloned directory:
+Navigate to the project directory:
 
-   `cd EconSimPython`
+`cd EconSimPython`
 
-3. Install the required Python packages:
+Install dependencies:
 
-   `pip install -r requirements.txt`
+`pip install -r requirements.txt`
 
 ### Running the Simulation
 
-To start the simulation, run the `main.py` script:
+Run the main simulation loop:
 
 `python main.py`
 
-## Usage
+The simulation progresses in discrete time steps (“days”), updating service prices, supply levels, demand, and agent balances.
 
-Once the simulation starts, it will automatically proceed through each day, updating and displaying the economic variables in real-time. You can play with the values in "constants.py" file under "data_types" folder to see how the simulation changes.
+Core economic parameters can be adjusted in:
 
-Some keyboard functions are:
+`src/data_types/constants.py`
 
-    V: Visualize the simulation
-    B: Run simulation without graphics
+### Controls
+
+V — Run simulation with visualization enabled  
+B — Run simulation without graphics
+
+## Learning Outcomes
+
+### This project explores and demonstrates:
+
+Proximal Policy Optimization with Generalized Advantage Estimation
+Continuous control in economic environments
+Reward shaping for multi-objective optimization
+Designing simulations around interacting economic entities
+
+## Future Improvements
+
+Multi-agent competition and market dynamics
+Episode termination logic and curriculum learning
+More realistic consumer behavior models
+External market shocks and policy interventions
 
 ## Contributing
 
-Contributions to EconSimPython are welcome!
+Contributions, feedback, and discussions are welcome.
