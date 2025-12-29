@@ -1,3 +1,4 @@
+import csv
 import random
 import keyboard
 import time
@@ -30,80 +31,98 @@ def check_keyboard():
 
 
 def read_currencies_from_file():
-    with open("data/currencies.txt", "r") as f:
-        for line in f:
-            arg = line.strip().split()
-            currency_name = arg[0]
-            currency = Currency(currency_name)
+    with open("data/currencies.csv", newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            currency = Currency(row["name"])
             data_collections.all_currencies.append(currency)
 
 
 def read_countries_from_file():
-    with open("data/countries.txt", "r") as f:
-        for line in f:
-            arg = line.strip().split()
+    with open("data/countries.csv", newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
             prosperity = random.randint(1, constants.MAX_PROSPERITY)
+            currency = data_collections.all_currencies[int(row["currency_index"])]
 
-            country_name = arg[0]
-            country_currency = data_collections.all_currencies[int(arg[1])]
-            country = Country(country_name, country_currency, prosperity)
+            country = Country(row["name"], currency, prosperity)
             data_collections.all_countries.append(country)
 
 
-def read_services_from_file():
-    with open("data/services.txt", "r") as f:
-        for line in f:
-            arg = line.strip().split()
+def read_people_from_file():
+    with open("data/people.csv", newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for i, row in enumerate(reader):
+            age_group = enums.AgeGroup[row["age_group"]]
+            gender = enums.Gender[row["gender"]]
+            country = data_collections.all_countries[int(row["country_index"])]
 
-            service_name = arg[0]
+            if i == 0 and config.AI_PERSON_EXISTS:
+                person = PersonAI(row["name"], age_group, gender, country)
+            else:
+                person = Person(row["name"], age_group, gender, country)
+
+            person.demandedServices = [(0, 0)] * constants.SERVICE_COUNT
+            data_collections.all_people.append(person)
+
+
+def read_services_from_file():
+    with open("data/services.csv", newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
             price = random.uniform(1, constants.CEIL_PRICE)
-            initial_supply = 10
-            customer_type = enums.ServiceConsumerType[arg[2]]
-            seller = data_collections.all_people[int(arg[1])]
+            seller = data_collections.all_people[int(row["seller_index"])]
+            consumer_type = enums.ServiceConsumerType[row["consumer_type"]]
 
             service = Service(
-                service_name,
+                row["name"],
                 price,
-                initial_supply,
-                seller,
-                customer_type,
+                initial_supply=10,
+                seller=seller,
+                customer_type=consumer_type,
             )
             data_collections.all_services.append(service)
 
 
-def read_people_from_file():
-    with open("data/people.txt", "r") as f:
-        for i, line in enumerate(f):
-            arg = line.strip().split()
-            name = arg[0]
-            age_group = enums.AgeGroup[arg[1]]
-            gender = enums.Gender[arg[2]]
-            country = data_collections.all_countries[int(arg[3])]
-            if i == 0 and config.AI_PERSON_EXISTS:
-                person = PersonAI(name, age_group, gender, country)
-            else:
-                person = Person(name, age_group, gender, country)
-            data_collections.all_people.append(person)
-
-            person.demandedServices = [(0, 0)] * constants.SERVICE_COUNT
-
-
 def write_data_to_file():
-    with open("data/people.txt", "w") as f:
-        for person in data_collections.all_people:
-            f.write(
-                f"{person.name} {person.age_group.name} {person.gender.name} {data_collections.all_countries.index(person.country)}\n"
-            )
-    with open("data/countries.txt", "w") as f:
-        for country in data_collections.all_countries:
-            f.write(
-                f"{country.name} {data_collections.all_currencies.index(country.currency)}\n"
-            )
-    with open("data/services.txt", "w") as f:
-        for service in data_collections.all_services:
-            f.write(
-                f"{service.name} {data_collections.all_people.index(service.seller)} {service.consumer_type.name}\n"
-            )
-    with open("data/currencies.txt", "w") as f:
+    with open("data/currencies.csv", "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["name"])
         for currency in data_collections.all_currencies:
-            f.write(f"{currency.name}\n")
+            writer.writerow([currency.name])
+
+    with open("data/countries.csv", "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["name", "currency_index"])
+        for country in data_collections.all_countries:
+            writer.writerow(
+                [
+                    country.name,
+                    data_collections.all_currencies.index(country.currency),
+                ]
+            )
+
+    with open("data/people.csv", "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["name", "age_group", "gender", "country_index"])
+        for person in data_collections.all_people:
+            writer.writerow(
+                [
+                    person.name,
+                    person.age_group.name,
+                    person.gender.name,
+                    data_collections.all_countries.index(person.country),
+                ]
+            )
+
+    with open("data/services.csv", "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["name", "seller_index", "consumer_type"])
+        for service in data_collections.all_services:
+            writer.writerow(
+                [
+                    service.name,
+                    data_collections.all_people.index(service.seller),
+                    service.consumer_type.name,
+                ]
+            )
