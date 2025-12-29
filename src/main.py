@@ -8,11 +8,11 @@ import src.data_types.constants as constants
 import src.data_types.config as config
 import src.data_types.data_collections as data_collections
 
-import src.functions.initialize as initialize
-import src.functions.update_functions as update_functions
-import src.functions.io_functions as io_functions
-import src.functions.graph_functions as graph_functions
-from src.functions.graph import RealTimeGraph
+import src.utils.initialize as initialize
+import src.utils.update_utils as update_utils
+import src.utils.io_utils as io_utils
+import src.utils.graph_utils as graph_utils
+from src.utils.graph import RealTimeGraph
 
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -28,7 +28,7 @@ def episode(i):
 
     p = data_collections.all_people[0]
     # Balance of people
-    graph_functions.initialize_new_graph(
+    graph_utils.initialize_new_graph(
         lambda: [
             person.balance / p.country.currency.exchange_rate[person.country.currency]
             for person in data_collections.all_people
@@ -37,7 +37,7 @@ def episode(i):
         "People Balance",
     )
     # Prices of services of given person
-    graph_functions.initialize_new_graph(
+    graph_utils.initialize_new_graph(
         lambda: [
             service.price
             for service in data_collections.all_people[show_index].provided_services
@@ -46,7 +46,7 @@ def episode(i):
         "Service Price",
     )
     # Demands of services of given person
-    graph_functions.initialize_new_graph(
+    graph_utils.initialize_new_graph(
         lambda: [
             service.demand
             for service in data_collections.all_people[show_index].provided_services
@@ -55,7 +55,7 @@ def episode(i):
         "Service Demand",
     )
     # Supplies of services of given person
-    graph_functions.initialize_new_graph(
+    graph_utils.initialize_new_graph(
         lambda: [
             service.supply_before_sales
             for service in data_collections.all_people[show_index].provided_services
@@ -64,7 +64,7 @@ def episode(i):
         "Service Supply",
     )
     # Count of recently bought services of given person
-    graph_functions.initialize_new_graph(
+    graph_utils.initialize_new_graph(
         lambda: [
             serv.bought_recently_count
             for serv in data_collections.all_people[show_index].provided_services
@@ -73,7 +73,7 @@ def episode(i):
         "Service Bought Recently Count",
     )
     # Revenues from services of given person
-    graph_functions.initialize_new_graph(
+    graph_utils.initialize_new_graph(
         lambda: [
             service.revenue
             for service in data_collections.all_people[show_index].provided_services
@@ -88,7 +88,7 @@ def episode(i):
     initialize_new_graph(
         lambda: [c.inflation for c in allCountries], COUNTRY_COUNT, "Country Inflation"
     )"""
-    graph_functions.initialize_new_graph(
+    graph_utils.initialize_new_graph(
         lambda: [c.value for c in data_collections.all_currencies],
         constants.COUNTRY_COUNT,
         "Currency Value",
@@ -100,8 +100,8 @@ def episode(i):
         agent.decide_action()
         agent.apply_action()
 
-        update_functions.update(day)
-        update_functions.after_update()
+        update_utils.update(day)
+        update_utils.after_update()
 
         agent.store_reward()
         if agent.should_update():
@@ -109,10 +109,10 @@ def episode(i):
 
         # Visualizing
         if config.VISUALIZE_GRAPHS:
-            graph_functions.update_graphs(day)
+            graph_utils.update_graphs(day)
 
         # IO Functions
-        io_functions.check_keyboard()
+        io_utils.check_keyboard()
 
         # Printing
         if day % 50 == 0:
@@ -120,7 +120,7 @@ def episode(i):
 
         # Do finishing simulation operations
         if (day + 1) % constants.MAX_DAY == 0:
-            graph_functions.close_graphs()
+            graph_utils.close_graphs()
             print(f"AI balance: {data_collections.all_people[0].balance}")
             break
 
@@ -136,7 +136,7 @@ while True:
     data_collections.all_people[0].save()
     print("Network data saved")
 
-    io_functions.write_data_to_file()
+    io_utils.write_data_to_file()
     print("Data written to files")
 
     i += 1

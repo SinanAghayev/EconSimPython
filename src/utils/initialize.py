@@ -13,8 +13,8 @@ from src.data_types.service_class import Service
 from src.data_types.person_class import Person
 from src.data_types.person_ai_class import PersonAI
 
-import src.functions.update_functions as update_functions
-import src.functions.io_functions as io_functions
+import src.utils.update_utils as update_utils
+import src.utils.io_utils as io_utils
 
 
 def start():
@@ -27,7 +27,7 @@ def start():
     init_countries()
     init_people()
     init_services()
-    update_functions.evaluate_all_services()
+    update_utils.evaluate_all_services()
     set_taxes()
 
     if isinstance(data_collections.all_people[0], PersonAI):
@@ -36,7 +36,7 @@ def start():
 
 def init_currencies():
     if config.READ_FROM_FILE:
-        io_functions.read_currencies_from_file()
+        io_utils.read_currencies_from_file()
     else:
         for i in range(constants.COUNTRY_COUNT):
             currency = Currency("Currency_" + str(i))
@@ -52,7 +52,7 @@ def init_currencies():
 
 def init_countries():
     if config.READ_FROM_FILE:
-        io_functions.read_countries_from_file()
+        io_utils.read_countries_from_file()
         return
 
     for i in range(constants.COUNTRY_COUNT):
@@ -68,7 +68,7 @@ def init_services():
     Service.service_id = 0
 
     if config.READ_FROM_FILE:
-        io_functions.read_services_from_file()
+        io_utils.read_services_from_file()
         return
 
     for i in range(constants.SERVICE_COUNT):
@@ -92,7 +92,7 @@ def init_services():
 
 def init_people():
     if config.READ_FROM_FILE:
-        io_functions.read_people_from_file()
+        io_utils.read_people_from_file()
         return
 
     if os.path.exists("networks"):

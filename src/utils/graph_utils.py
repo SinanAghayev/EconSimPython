@@ -1,7 +1,7 @@
 import tkinter as tk
 import matplotlib.pyplot as plt
 
-from src.functions.graph import RealTimeGraph, RealTimeGraph3D
+from src.utils.graph import RealTimeGraph, RealTimeGraph3D
 from src.data_types.graph_state import graph_apps, graph_roots, graph_update_lists
 
 
